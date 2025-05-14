@@ -14,7 +14,9 @@
             <div class="modal-content">
                 <h2>Select User</h2>
                 <div class="user-selection">
-                    <button onclick="selectUser('luu')" class="user-btn luu-btn">luu</button>
+                    <button onclick="selectUser('luu')" class="user-btn luu-btn">
+                        <img src="{{ url_for('static', filename='images/luu-logo.png') }}" alt="luu" class="user-logo">
+                    </button>
                     <button onclick="selectUser('4keni')" class="user-btn keni-btn">
                         <img src="{{ url_for('static', filename='images/4keni-logo.png') }}" alt="4keni" class="user-logo">
                     </button>

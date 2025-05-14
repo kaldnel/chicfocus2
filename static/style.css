@@ -141,6 +141,7 @@ body {
 
 .keni-btn:hover {
     transform: scale(1.05);
+    filter: drop-shadow(0 0 10px rgba(255, 107, 157, 0.6));
 }
 
 /* Cycle Complete Modal */
@@ -898,12 +899,20 @@ input:focus-visible {
     transition: all 0.3s ease;
 }
 
-.luu-btn {
-    width: 100px;
-    height: 100px;
-    font-size: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-transform: lowercase;
+.user-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.luu-btn:hover {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6));
+}
+
+.keni-btn:hover {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 10px rgba(255, 107, 157, 0.6));
 } 
