@@ -504,52 +504,27 @@ body {
 }
 
 /* Button styles */
-.start-btn, .control-btn {
-    padding: 1rem 2rem;
-    border: none;
-    border-radius: 8px;
-    font-size: 1.1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-family: inherit;
-    position: relative;
-    overflow: hidden;
-}
-
-.start-btn {
-    width: 100%;
-    font-size: 1.2rem;
-}
-
-.luu-panel .start-btn, .luu-panel .control-btn {
-    background: var(--luu-border);
-    color: var(--luu-text);
-    border: 1px solid var(--luu-border);
-}
-
-.luu-panel .start-btn:hover:not(:disabled), .luu-panel .control-btn:hover:not(:disabled) {
+#start-btn, .control-btn, .end-cycle-btn {
     background: var(--luu-accent);
-    color: var(--luu-bg);
-    box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+    color: black;
+    padding: 10px 15px;
+    border-radius: 5px;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: all 0.3s ease;
 }
 
-.keni-panel .start-btn, .keni-panel .control-btn {
-    background: var(--keni-accent);
-    color: white;
-    border-radius: 15px;
-}
-
-.keni-panel .start-btn:hover:not(:disabled), .keni-panel .control-btn:hover:not(:disabled) {
-    background: #ff5c8a;
+#start-btn:hover, .control-btn:hover, .end-cycle-btn:hover {
+    opacity: 0.9;
     transform: translateY(-2px);
-    box-shadow: 0 5px 25px rgba(255, 107, 157, 0.3);
 }
 
-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none !important;
+#pause-btn, #reset-btn {
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 0 5px;
 }
 
 /* Timer styles */

@@ -143,43 +143,78 @@ def handle_connect():
 
 @socketio.on('start_chicken')
 def handle_start_chicken(json_data):
-    user = json_data['user']
-    task_name = json_data['task_name']
-    tier = int(json_data['tier'])
+    print(f"Received start_chicken event with data: {json_data}")
     
-    data = load_data()
-    
-    # Check daily limit
-    sessions_today = len([s for s in data["users"][user]["sessions"] 
-                        if datetime.datetime.fromisoformat(s["timestamp"]).date() == datetime.date.today()])
-    
-    if sessions_today >= 5:
-        emit('error', {'message': 'Daily limit of 5 chickens reached!'})
+    # Validate input data
+    if 'user' not in json_data or not json_data['user']:
+        print("Error: Missing user in start_chicken data")
+        emit('error', {'message': 'Missing user data'})
+        return
+        
+    if 'task_name' not in json_data or not json_data['task_name']:
+        print("Error: Missing task_name in start_chicken data")
+        emit('error', {'message': 'Missing task name'})
+        return
+        
+    if 'tier' not in json_data:
+        print("Error: Missing tier in start_chicken data")
+        emit('error', {'message': 'Missing tier data'})
         return
     
-    # Create session object
-    session = {
-        "task_name": task_name,
-        "tier": tier,
-        "timestamp": datetime.datetime.now().isoformat(),
-        "completed": False
-    }
-    
-    # Start timer
-    duration = CHICKEN_TYPES[tier]["time"] * 60
-    threading.Thread(target=timer_worker, args=(user, duration), daemon=True).start()
-    
-    # Store session temporarily (will be completed when timer ends)
-    if user not in active_timers:
-        active_timers[user] = {}
-    active_timers[user]['current_session'] = session
-    
-    emit('chicken_started', {
-        'user': user,
-        'task_name': task_name,
-        'tier': tier,
-        'duration': duration
-    }, broadcast=True)
+    try:
+        user = json_data['user']
+        task_name = json_data['task_name']
+        tier = int(json_data['tier'])
+        
+        if user not in USERS:
+            print(f"Error: Invalid user '{user}'")
+            emit('error', {'message': f'Invalid user: {user}'})
+            return
+            
+        if tier not in CHICKEN_TYPES:
+            print(f"Error: Invalid tier '{tier}'")
+            emit('error', {'message': f'Invalid tier: {tier}'})
+            return
+        
+        data = load_data()
+        
+        # Check daily limit
+        sessions_today = len([s for s in data["users"][user]["sessions"] 
+                          if datetime.datetime.fromisoformat(s["timestamp"]).date() == datetime.date.today()])
+        
+        if sessions_today >= 5:
+            print(f"Error: Daily limit reached for user '{user}'")
+            emit('error', {'message': 'Daily limit of 5 chickens reached!'})
+            return
+        
+        # Create session object
+        session = {
+            "task_name": task_name,
+            "tier": tier,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "completed": False
+        }
+        
+        # Start timer
+        duration = CHICKEN_TYPES[tier]["time"] * 60
+        threading.Thread(target=timer_worker, args=(user, duration), daemon=True).start()
+        
+        # Store session temporarily (will be completed when timer ends)
+        if user not in active_timers:
+            active_timers[user] = {}
+        active_timers[user]['current_session'] = session
+        
+        print(f"Starting chicken for '{user}': {task_name} (Tier {tier})")
+        emit('chicken_started', {
+            'user': user,
+            'task_name': task_name,
+            'tier': tier,
+            'duration': duration
+        }, broadcast=True)
+        
+    except Exception as e:
+        print(f"Error in start_chicken: {str(e)}")
+        emit('error', {'message': f'Server error: {str(e)}'})
 
 @socketio.on('pause_timer')
 def handle_pause_timer(json_data):

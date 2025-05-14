@@ -133,6 +133,21 @@
         let timerPaused = false;
         let isBreak = false;
 
+        // Debug socket connection
+        socket.on('connect', () => {
+            console.log('Socket connected successfully!');
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+            alert('Connection error: ' + error.message);
+        });
+        
+        socket.on('error', (error) => {
+            console.error('Socket error:', error);
+            alert('Socket error: ' + error.message);
+        });
+        
         // User selection
         function selectUser(user) {
             currentUser = user;
@@ -166,16 +181,26 @@
             const taskName = document.getElementById('task-name').value.trim();
             const tier = document.querySelector('input[name="tier"]:checked').value;
             
+            console.log('Starting chicken with:', { user: currentUser, task_name: taskName, tier: tier });
+            
             if (!taskName) {
                 alert('Please enter a task name!');
                 return;
             }
             
+            if (!currentUser) {
+                alert('Error: No user selected. Please try logging in again.');
+                return;
+            }
+            
+            // Emit the start_chicken event
             socket.emit('start_chicken', {
                 user: currentUser,
                 task_name: taskName,
                 tier: tier
             });
+            
+            console.log('Chicken start request sent');
         }
 
         function pauseTimer() {
@@ -304,10 +329,6 @@
                 message = `🎉 ${data.winner} wins!\n\n${data.winner} gets to choose who picks the next date activity.`;
             }
             alert(message);
-        });
-
-        socket.on('error', (data) => {
-            alert(data.message);
         });
 
         function updateActivityLog(data) {
