@@ -132,16 +132,15 @@ body {
 }
 
 .keni-btn {
-    background: var(--keni-accent);
-    color: white;
-    font-family: 'Poppins', sans-serif;
-    border: 2px solid transparent;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
 .keni-btn:hover {
-    background: #ff5c8a;
-    transform: translateY(-2px) scale(1.05);
-    box-shadow: 0 5px 25px rgba(255, 107, 157, 0.4);
+    transform: scale(1.05);
 }
 
 /* Cycle Complete Modal */
@@ -882,4 +881,29 @@ input:focus-visible {
 .keni-panel button:focus-visible,
 .keni-panel input:focus-visible {
     outline-color: var(--keni-accent);
+}
+
+/* User selection styling */
+.user-selection {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 1.5rem;
+}
+
+.user-logo {
+    width: 100px;
+    height: 100px;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.luu-btn {
+    width: 100px;
+    height: 100px;
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: lowercase;
 } 

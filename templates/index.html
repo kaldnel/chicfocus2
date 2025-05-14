@@ -13,8 +13,12 @@
         <div id="user-modal" class="modal">
             <div class="modal-content">
                 <h2>Select User</h2>
-                <button onclick="selectUser('luu')" class="user-btn">luu</button>
-                <button onclick="selectUser('4keni')" class="user-btn">4keni</button>
+                <div class="user-selection">
+                    <button onclick="selectUser('luu')" class="user-btn luu-btn">luu</button>
+                    <button onclick="selectUser('4keni')" class="user-btn keni-btn">
+                        <img src="{{ url_for('static', filename='images/4keni-logo.png') }}" alt="4keni" class="user-logo">
+                    </button>
+                </div>
             </div>
         </div>
 
