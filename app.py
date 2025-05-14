@@ -8,7 +8,11 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, 
+                   cors_allowed_origins="*",
+                   async_mode='eventlet',
+                   logger=True,
+                   engineio_logger=True)
 
 # Data storage
 DATA_FILE = 'data/chickens.json'
@@ -283,4 +287,8 @@ def emit_full_update(data):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True) 
+    socketio.run(app, 
+                host='0.0.0.0', 
+                port=port,
+                debug=False,
+                use_reloader=False) 
