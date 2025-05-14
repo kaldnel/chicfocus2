@@ -61,17 +61,17 @@ body {
 
 .modal-content {
     background: var(--luu-bg-card);
-    padding: 2rem;
-    border-radius: 12px;
+    padding: 1.5rem;
+    border-radius: 10px;
     text-align: center;
-    box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
-    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    max-width: 300px;
     width: 90%;
 }
 
 .modal-content h2 {
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    margin-bottom: 0.8rem;
     color: #fff;
 }
 
@@ -88,21 +88,17 @@ body {
 }
 
 .user-btn {
-    padding: 1.2rem 2rem;
+    background: transparent;
     border: none;
-    border-radius: 8px;
-    font-size: 1.2rem;
-    font-weight: 500;
+    padding: 3px;
     cursor: pointer;
     transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
 }
 
 .luu-btn {
-    width: 60px;
-    height: 60px;
-    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -140,8 +136,7 @@ body {
 }
 
 .keni-btn:hover {
-    transform: scale(1.05);
-    filter: drop-shadow(0 0 10px rgba(255, 107, 157, 0.6));
+    transform: scale(1.15);
 }
 
 /* Cycle Complete Modal */
@@ -929,14 +924,14 @@ input:focus-visible {
 .user-selection {
     display: flex;
     justify-content: center;
-    gap: 2rem;
-    margin-top: 1.5rem;
+    gap: 1.5rem;
+    margin-top: 1rem;
 }
 
 .user-logo {
-    width: 60px;
-    height: 60px;
-    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
     transition: all 0.3s ease;
 }
 
