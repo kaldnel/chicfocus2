@@ -19,15 +19,15 @@
     --luu-border: #333;
     --luu-hover: #333;
     
-    /* 4keni colors */
-    --keni-bg: #fef7f7;
-    --keni-bg-secondary: #fdf0f4;
+    /* 4keni colors - Hello Kitty theme */
+    --keni-bg: #fff5f8;
+    --keni-bg-secondary: #fff0f4;
     --keni-bg-card: #ffffff;
-    --keni-text: #2d2d2d;
+    --keni-text: #333333;
     --keni-text-secondary: #666;
     --keni-accent: #ff6b9d;
-    --keni-border: #fce4ec;
-    --keni-hover: #f8bbd9;
+    --keni-border: #ffcce0;
+    --keni-hover: #ffdfea;
     
     /* Tier colors */
     --tier-1: #6c757d;
@@ -243,9 +243,32 @@ body {
 .keni-panel {
     background: var(--keni-bg);
     background-image: 
+        url('/static/images/4keni-background.png'),
         radial-gradient(circle at 20% 50%, rgba(255, 107, 157, 0.05) 0%, transparent 50%),
         radial-gradient(circle at 80% 50%, rgba(255, 107, 157, 0.05) 0%, transparent 50%);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+    position: relative;
     font-family: 'Poppins', sans-serif;
+}
+
+/* Add overlay to ensure text is readable over image */
+.keni-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 240, 245, 0.85);
+    z-index: 0;
+}
+
+/* Ensure content is above the overlay */
+.keni-panel > * {
+    position: relative;
+    z-index: 1;
 }
 
 /* Panel headers */
@@ -327,11 +350,29 @@ body {
     border: 1px solid var(--keni-border);
     box-shadow: 0 4px 20px rgba(255, 107, 157, 0.1);
     border-radius: 20px;
+    position: relative;
+}
+
+.keni-panel .card::after {
+    content: '';
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    width: 30px;
+    height: 30px;
+    background-image: url('/static/images/kitty-bow.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 0.6;
 }
 
 .keni-panel .card:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 30px rgba(255, 107, 157, 0.15);
+}
+
+.keni-panel .card:hover::after {
+    opacity: 1;
 }
 
 .card h3 {
