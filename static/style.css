@@ -61,17 +61,17 @@ body {
 
 .modal-content {
     background: var(--luu-bg-card);
-    padding: 1.5rem;
-    border-radius: 10px;
+    padding: 1rem;
+    border-radius: 8px;
     text-align: center;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    max-width: 300px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    max-width: 200px;
     width: 90%;
 }
 
 .modal-content h2 {
-    font-size: 1.2rem;
-    margin-bottom: 0.8rem;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
     color: #fff;
 }
 
@@ -87,23 +87,36 @@ body {
     justify-content: center;
 }
 
+.user-logo {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    object-fit: contain;
+}
+
 .user-btn {
     background: transparent;
     border: none;
-    padding: 3px;
+    padding: 2px;
+    margin: 0;
     cursor: pointer;
     transition: all 0.3s ease;
-}
-
-.luu-btn {
-    width: 40px;
-    height: 40px;
-    font-size: 1.2rem;
+    width: 30px;
+    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.luu-btn {
+    font-size: 0.9rem;
     text-transform: lowercase;
     font-family: 'Roboto Mono', monospace;
+}
+
+.luu-btn:hover, .keni-btn:hover {
+    transform: scale(1.15);
 }
 
 .luu-btn::before {
@@ -133,10 +146,6 @@ body {
     padding: 0;
     cursor: pointer;
     transition: all 0.3s ease;
-}
-
-.keni-btn:hover {
-    transform: scale(1.15);
 }
 
 /* Cycle Complete Modal */
@@ -924,23 +933,30 @@ input:focus-visible {
 .user-selection {
     display: flex;
     justify-content: center;
-    gap: 1.5rem;
-    margin-top: 1rem;
+    gap: 1rem;
+    margin-top: 0.8rem;
 }
 
 .user-logo {
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
     transition: all 0.3s ease;
+    object-fit: contain;
 }
 
 .user-btn {
     background: transparent;
     border: none;
-    padding: 0;
+    padding: 2px;
+    margin: 0;
     cursor: pointer;
     transition: all 0.3s ease;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .luu-btn:hover {
