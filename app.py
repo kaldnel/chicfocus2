@@ -7,6 +7,8 @@ import time
 import os
 import logging
 import uuid
+import eventlet
+eventlet.monkey_patch()
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -17,6 +19,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
 socketio = SocketIO(app, 
                    cors_allowed_origins="*",
+                   async_mode='eventlet',
                    logger=True,
                    engineio_logger=True,
                    ping_timeout=60,
