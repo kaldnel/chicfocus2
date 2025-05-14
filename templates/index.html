@@ -46,7 +46,7 @@
                     <h2 id="current-user-name"></h2>
                     
                     <!-- Task Input -->
-                    <div class="task-section">
+                    <div class="task-section card">
                         <h3>Start New Chicken</h3>
                         <input type="text" id="task-name" placeholder="Enter task name...">
                         
@@ -64,7 +64,7 @@
                     </div>
 
                     <!-- Timer -->
-                    <div class="timer-section">
+                    <div class="timer-section card">
                         <div id="timer-display">00:00</div>
                         <div id="timer-status">Ready to start</div>
                         <div class="timer-controls">
@@ -74,11 +74,33 @@
                     </div>
 
                     <!-- Current User Stats -->
-                    <div class="stats-section">
+                    <div class="stats-section card">
                         <h3>Your Stats</h3>
                         <div id="current-stats">
                             <div>Points: <span id="current-points">0</span></div>
                             <div>Today's Chickens: <span id="current-sessions">0</span>/5</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Folder Management -->
+                    <div class="folder-management card">
+                        <div class="folder-header">
+                            <h3>Folders</h3>
+                            <button onclick="createNewFolder()" class="sm-btn">+ New Folder</button>
+                        </div>
+                        
+                        <div class="folder-count">
+                            Current folder: <span id="current-folder-name">Default</span>
+                            <span id="folder-chicken-count">(0 chickens)</span>
+                        </div>
+                        
+                        <div class="folder-tree" id="folder-tree">
+                            <!-- Folder tree will be populated by JS -->
+                        </div>
+                        
+                        <div class="folder-content" id="folder-content">
+                            <!-- Folder contents will be populated by JS -->
+                            <div class="empty-folder-msg">No chickens in this folder yet.</div>
                         </div>
                     </div>
                 </div>
@@ -88,13 +110,13 @@
                     <h2 id="partner-name"></h2>
                     
                     <!-- Partner Timer -->
-                    <div class="timer-section">
+                    <div class="timer-section card">
                         <div id="partner-timer">00:00</div>
                         <div id="partner-status">Idle</div>
                     </div>
 
                     <!-- Partner Stats -->
-                    <div class="stats-section">
+                    <div class="stats-section card">
                         <h3>Partner Stats</h3>
                         <div id="partner-stats">
                             <div>Points: <span id="partner-points">0</span></div>
@@ -102,10 +124,12 @@
                         </div>
                     </div>
 
-                    <!-- Recent Activity -->
-                    <div class="activity-section">
-                        <h3>Recent Activity</h3>
-                        <div id="activity-log"></div>
+                    <!-- Partner Folder View -->
+                    <div class="partner-folders card">
+                        <h3>Partner's Folders</h3>
+                        <div class="partner-folder-tree" id="partner-folder-tree">
+                            <!-- Partner folder tree will be populated by JS -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -117,10 +141,50 @@
                     <button onclick="endCycle()" class="end-cycle-btn">End Cycle</button>
                 </div>
 
-                <div class="full-log">
+                <div class="full-log card">
                     <h3>Complete Log</h3>
                     <div id="full-log"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Folder Creation/Edit Modal -->
+    <div id="folder-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="folder-modal-title">New Folder</h2>
+            <input type="text" id="folder-name" placeholder="Folder name">
+            
+            <div class="emoji-selector">
+                <label>Emoji (optional):</label>
+                <div class="emoji-grid">
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('📁')">📁</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('📚')">📚</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('📝')">📝</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('💼')">💼</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('🏠')">🏠</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('🏫')">🏫</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('🎮')">🎮</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('🎵')">🎵</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('🏋️')">🏋️</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('🍳')">🍳</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('📱')">📱</button>
+                    <button type="button" class="emoji-btn" onclick="selectEmoji('💻')">💻</button>
+                </div>
+                <div class="selected-emoji" id="selected-emoji">📁</div>
+            </div>
+            
+            <div class="parent-folder-selector">
+                <label>Parent folder (optional):</label>
+                <select id="parent-folder-select">
+                    <option value="">None (Root level)</option>
+                    <!-- Options will be populated by JS -->
+                </select>
+            </div>
+            
+            <div class="folder-modal-buttons">
+                <button onclick="closeModal('folder-modal')" class="cancel-btn">Cancel</button>
+                <button onclick="saveFolder()" class="save-btn">Save</button>
             </div>
         </div>
     </div>
@@ -129,9 +193,10 @@
         // Initialize socket with error handling
         const socket = io({
             reconnection: true,
-            reconnectionAttempts: 5,
+            reconnectionAttempts: 10,
             reconnectionDelay: 1000,
-            timeout: 20000
+            timeout: 30000,
+            transports: ['websocket', 'polling']
         });
         
         let currentUser = null;
@@ -139,7 +204,13 @@
         let timerRunning = false;
         let timerPaused = false;
         let isBreak = false;
-
+        
+        // Folder management variables
+        let userFolders = [];
+        let partnerFolders = [];
+        let currentFolderId = null;
+        let editingFolderId = null;
+        
         // Debug socket connection
         socket.on('connect', () => {
             console.log('Socket connected successfully! ID:', socket.id);
@@ -164,7 +235,7 @@
         
         socket.on('error', (error) => {
             console.error('Socket error:', error);
-            alert('Socket error: ' + error.message);
+            alert(error.message || 'An error occurred');
         });
         
         // User selection
@@ -174,7 +245,7 @@
             
             // Load appropriate stylesheet
             const stylesheet = document.getElementById('user-stylesheet');
-            stylesheet.href = `/static/style_${user}.css`;
+            stylesheet.href = `/static/style.css`;
             
             // Update UI
             document.getElementById('user-modal').classList.add('hidden');
@@ -195,7 +266,7 @@
             partnerUser = null;
         }
 
-        // Chicken management
+        // More detailed debug for start chicken
         function startChicken() {
             if (!socket.connected) {
                 console.error('Socket not connected! Cannot start chicken.');
@@ -244,6 +315,343 @@
             }, 5000);
         }
 
+        // Folder Management Functions
+        function createNewFolder() {
+            // Reset the folder modal
+            document.getElementById('folder-modal-title').textContent = 'Create New Folder';
+            document.getElementById('folder-name').value = '';
+            document.getElementById('selected-emoji').textContent = '📁';
+            populateParentFolderSelect();
+            editingFolderId = null;
+            
+            // Show the modal
+            document.getElementById('folder-modal').classList.remove('hidden');
+        }
+        
+        function editFolder(folderId) {
+            const folder = userFolders.find(f => f.id === folderId);
+            if (!folder) return;
+            
+            // Set modal for editing
+            document.getElementById('folder-modal-title').textContent = 'Edit Folder';
+            document.getElementById('folder-name').value = folder.name;
+            document.getElementById('selected-emoji').textContent = folder.emoji || '📁';
+            populateParentFolderSelect(folderId);
+            
+            // Set the parent folder
+            const parentSelect = document.getElementById('parent-folder-select');
+            parentSelect.value = folder.parent_id || '';
+            
+            editingFolderId = folderId;
+            
+            // Show the modal
+            document.getElementById('folder-modal').classList.remove('hidden');
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+        
+        function selectEmoji(emoji) {
+            document.getElementById('selected-emoji').textContent = emoji;
+        }
+        
+        function populateParentFolderSelect(excludeFolderId = null) {
+            const select = document.getElementById('parent-folder-select');
+            select.innerHTML = '<option value="">None (Root level)</option>';
+            
+            // Get all potential parent folders (excluding the one being edited)
+            userFolders.forEach(folder => {
+                if (folder.id !== excludeFolderId) {
+                    // Check if this would create a circular reference
+                    if (!wouldCreateCircularReference(folder.id, excludeFolderId)) {
+                        const option = document.createElement('option');
+                        option.value = folder.id;
+                        option.textContent = `${folder.emoji || '📁'} ${folder.name}`;
+                        select.appendChild(option);
+                    }
+                }
+            });
+        }
+        
+        function wouldCreateCircularReference(potentialParentId, childId) {
+            if (!childId || !potentialParentId) return false;
+            
+            // Check if any ancestor of potentialParentId is childId
+            let currentId = potentialParentId;
+            while (currentId) {
+                const folder = userFolders.find(f => f.id === currentId);
+                if (!folder) return false;
+                
+                if (folder.parent_id === childId) return true;
+                currentId = folder.parent_id;
+            }
+            
+            return false;
+        }
+        
+        function saveFolder() {
+            const folderName = document.getElementById('folder-name').value.trim();
+            if (!folderName) {
+                alert('Please enter a folder name');
+                return;
+            }
+            
+            const emoji = document.getElementById('selected-emoji').textContent;
+            const parentId = document.getElementById('parent-folder-select').value || null;
+            
+            if (editingFolderId) {
+                // Editing existing folder
+                socket.emit('edit_folder', {
+                    user: currentUser,
+                    folder_id: editingFolderId,
+                    name: folderName,
+                    emoji: emoji,
+                    parent_id: parentId
+                });
+            } else {
+                // Creating new folder
+                socket.emit('create_folder', {
+                    user: currentUser,
+                    name: folderName,
+                    emoji: emoji,
+                    parent_id: parentId
+                });
+            }
+            
+            closeModal('folder-modal');
+        }
+        
+        function deleteFolder(folderId) {
+            if (confirm('Are you sure you want to delete this folder? All chickens will be moved to the Default folder.')) {
+                socket.emit('delete_folder', {
+                    user: currentUser,
+                    folder_id: folderId
+                });
+            }
+        }
+        
+        function selectFolder(folderId) {
+            currentFolderId = folderId;
+            renderFolderContent();
+        }
+        
+        function renderFolderTree() {
+            const treeElement = document.getElementById('folder-tree');
+            treeElement.innerHTML = '';
+            
+            // Function to render a folder and its children
+            function renderFolder(folder, level = 0) {
+                const folderElement = document.createElement('div');
+                folderElement.className = `folder-item ${currentFolderId === folder.id ? 'selected' : ''}`;
+                folderElement.style.paddingLeft = `${level * 20}px`;
+                folderElement.setAttribute('data-folder-id', folder.id);
+                
+                // Count chickens in this folder and all subfolders
+                const chickenCount = countChickensInFolder(folder.id);
+                
+                folderElement.innerHTML = `
+                    <div class="folder-item-content">
+                        <div class="folder-icon">${folder.emoji || '📁'}</div>
+                        <div class="folder-name">${folder.name}</div>
+                        <div class="folder-chicken-count">(${chickenCount})</div>
+                        <div class="folder-actions">
+                            <button class="folder-btn edit" onclick="event.stopPropagation(); editFolder('${folder.id}')">✏️</button>
+                            ${folder.id.endsWith('_default') ? '' : 
+                                `<button class="folder-btn delete" onclick="event.stopPropagation(); deleteFolder('${folder.id}')">🗑️</button>`}
+                        </div>
+                    </div>
+                `;
+                
+                folderElement.onclick = () => selectFolder(folder.id);
+                
+                // Add droppable capabilities for drag-and-drop
+                folderElement.ondragover = (e) => {
+                    e.preventDefault();
+                    folderElement.classList.add('drag-over');
+                };
+                
+                folderElement.ondragleave = () => {
+                    folderElement.classList.remove('drag-over');
+                };
+                
+                folderElement.ondrop = (e) => {
+                    e.preventDefault();
+                    folderElement.classList.remove('drag-over');
+                    
+                    const chickenId = e.dataTransfer.getData('chickenId');
+                    const sourceFolderId = e.dataTransfer.getData('sourceFolderId');
+                    
+                    if (chickenId && folder.id !== sourceFolderId) {
+                        moveChicken(chickenId, sourceFolderId, folder.id);
+                    }
+                };
+                
+                treeElement.appendChild(folderElement);
+                
+                // Render children recursively
+                const children = userFolders.filter(f => f.parent_id === folder.id);
+                children.forEach(child => renderFolder(child, level + 1));
+            }
+            
+            // Render root folders (folders with no parent)
+            const rootFolders = userFolders.filter(f => !f.parent_id);
+            rootFolders.forEach(folder => renderFolder(folder));
+        }
+        
+        function renderPartnerFolderTree() {
+            const treeElement = document.getElementById('partner-folder-tree');
+            treeElement.innerHTML = '';
+            
+            // Function to render a folder and its children
+            function renderFolder(folder, level = 0) {
+                const folderElement = document.createElement('div');
+                folderElement.className = 'partner-folder-item';
+                folderElement.style.paddingLeft = `${level * 20}px`;
+                
+                // Count chickens in this folder and all subfolders
+                const chickenCount = countPartnerChickensInFolder(folder.id);
+                
+                folderElement.innerHTML = `
+                    <div class="folder-item-content">
+                        <div class="folder-icon">${folder.emoji || '📁'}</div>
+                        <div class="folder-name">${folder.name}</div>
+                        <div class="folder-chicken-count">(${chickenCount})</div>
+                    </div>
+                `;
+                
+                treeElement.appendChild(folderElement);
+                
+                // Render children recursively
+                const children = partnerFolders.filter(f => f.parent_id === folder.id);
+                children.forEach(child => renderFolder(child, level + 1));
+            }
+            
+            // Render root folders (folders with no parent)
+            const rootFolders = partnerFolders.filter(f => !f.parent_id);
+            rootFolders.forEach(folder => renderFolder(folder));
+        }
+        
+        function renderFolderContent() {
+            const contentElement = document.getElementById('folder-content');
+            const currentFolder = userFolders.find(f => f.id === currentFolderId);
+            
+            if (!currentFolder) {
+                // If no folder is selected or the selected folder doesn't exist,
+                // select the default folder if available
+                const defaultFolder = userFolders.find(f => f.id === `${currentUser}_default`);
+                if (defaultFolder) {
+                    currentFolderId = defaultFolder.id;
+                    renderFolderContent();
+                }
+                return;
+            }
+            
+            // Update folder name and count display
+            document.getElementById('current-folder-name').textContent = 
+                `${currentFolder.emoji || '📁'} ${currentFolder.name}`;
+            document.getElementById('folder-chicken-count').textContent = 
+                `(${countChickensInFolder(currentFolderId)} chickens)`;
+            
+            contentElement.innerHTML = '';
+            
+            if (!currentFolder.chickens || currentFolder.chickens.length === 0) {
+                contentElement.innerHTML = '<div class="empty-folder-msg">No chickens in this folder yet.</div>';
+                return;
+            }
+            
+            // Sort chickens by completion time, newest first
+            const sortedChickens = [...currentFolder.chickens].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp));
+            
+            sortedChickens.forEach(chicken => {
+                const chickenElement = document.createElement('div');
+                chickenElement.className = `chicken-item tier-${chicken.tier}`;
+                chickenElement.setAttribute('draggable', 'true');
+                chickenElement.setAttribute('data-chicken-id', chicken.id);
+                
+                const completionDate = new Date(chicken.timestamp);
+                const timeString = completionDate.toLocaleString();
+                
+                // Choose chicken image based on tier - updated to use SVG files
+                const chickenImage = `/static/images/chicken_tier${chicken.tier}.svg`;
+                
+                chickenElement.innerHTML = `
+                    <div class="chicken-image">
+                        <img src="${chickenImage}" alt="Chicken Tier ${chicken.tier}">
+                    </div>
+                    <div class="chicken-details">
+                        <div class="chicken-name">${chicken.task_name}</div>
+                        <div class="chicken-time">${timeString}</div>
+                        <div class="chicken-tier">Tier ${chicken.tier}</div>
+                    </div>
+                `;
+                
+                // Add drag functionality
+                chickenElement.ondragstart = (e) => {
+                    e.dataTransfer.setData('chickenId', chicken.id);
+                    e.dataTransfer.setData('sourceFolderId', currentFolderId);
+                    chickenElement.classList.add('dragging');
+                };
+                
+                chickenElement.ondragend = () => {
+                    chickenElement.classList.remove('dragging');
+                };
+                
+                contentElement.appendChild(chickenElement);
+            });
+        }
+        
+        function countChickensInFolder(folderId) {
+            if (!folderId) return 0;
+            
+            // Get the folder
+            const folder = userFolders.find(f => f.id === folderId);
+            if (!folder) return 0;
+            
+            // Count chickens in this folder
+            let count = folder.chickens ? folder.chickens.length : 0;
+            
+            // Recursively count chickens in all subfolders
+            const subfolders = userFolders.filter(f => f.parent_id === folderId);
+            subfolders.forEach(subfolder => {
+                count += countChickensInFolder(subfolder.id);
+            });
+            
+            return count;
+        }
+        
+        function countPartnerChickensInFolder(folderId) {
+            if (!folderId) return 0;
+            
+            // Get the folder
+            const folder = partnerFolders.find(f => f.id === folderId);
+            if (!folder) return 0;
+            
+            // Count chickens in this folder
+            let count = folder.chickens ? folder.chickens.length : 0;
+            
+            // Recursively count chickens in all subfolders
+            const subfolders = partnerFolders.filter(f => f.parent_id === folderId);
+            subfolders.forEach(subfolder => {
+                count += countPartnerChickensInFolder(subfolder.id);
+            });
+            
+            return count;
+        }
+        
+        function moveChicken(chickenId, sourceFolderId, targetFolderId) {
+            if (sourceFolderId === targetFolderId) return;
+            
+            socket.emit('move_chicken', {
+                user: currentUser,
+                chicken_id: chickenId,
+                source_folder_id: sourceFolderId,
+                target_folder_id: targetFolderId
+            });
+        }
+        
+        // Timer functions
         function pauseTimer() {
             if (!timerPaused) {
                 socket.emit('pause_timer', {user: currentUser});
@@ -342,6 +750,24 @@
                 document.getElementById('partner-status').textContent = 'Completed session 🎉';
             }
         });
+        
+        socket.on('chicken_created', (data) => {
+            // Refresh the folder view when a chicken is created
+            if (data.user === currentUser || data.user === partnerUser) {
+                console.log('Chicken created:', data);
+            }
+        });
+        
+        socket.on('folders_updated', (data) => {
+            if (data.user === currentUser) {
+                userFolders = data.folders;
+                renderFolderTree();
+                renderFolderContent();
+            } else if (data.user === partnerUser) {
+                partnerFolders = data.folders;
+                renderPartnerFolderTree();
+            }
+        });
 
         socket.on('full_update', (data) => {
             if (!currentUser) return;
@@ -357,8 +783,28 @@
             // Update cycle info
             document.getElementById('days-remaining').textContent = data.days_remaining;
             
-            // Update activity log
-            updateActivityLog(data);
+            // Update folders
+            if (data.users[currentUser].folders) {
+                userFolders = data.users[currentUser].folders;
+                
+                // If no folder is selected yet, select the default folder
+                if (!currentFolderId) {
+                    const defaultFolder = userFolders.find(f => f.id === `${currentUser}_default`);
+                    if (defaultFolder) {
+                        currentFolderId = defaultFolder.id;
+                    }
+                }
+                
+                renderFolderTree();
+                renderFolderContent();
+            }
+            
+            if (data.users[partnerUser].folders) {
+                partnerFolders = data.users[partnerUser].folders;
+                renderPartnerFolderTree();
+            }
+            
+            // Update log
             updateFullLog(data);
         });
 
@@ -371,23 +817,6 @@
             }
             alert(message);
         });
-
-        function updateActivityLog(data) {
-            const partnerSessions = data.users[partnerUser].sessions;
-            const recent = partnerSessions.slice(-5).reverse();
-            
-            const logHtml = recent.map(session => {
-                const date = new Date(session.timestamp);
-                const timeStr = date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'});
-                return `<div class="log-entry">
-                    <span class="task-name">${session.task_name}</span>
-                    <span class="tier">Tier ${session.tier}</span>
-                    <span class="time">${timeStr}</span>
-                </div>`;
-            }).join('');
-            
-            document.getElementById('activity-log').innerHTML = logHtml;
-        }
 
         function updateFullLog(data) {
             const allSessions = [];

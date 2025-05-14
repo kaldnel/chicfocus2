@@ -6,6 +6,7 @@ import threading
 import time
 import os
 import logging
+import uuid
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -16,7 +17,6 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
 socketio = SocketIO(app, 
                    cors_allowed_origins="*",
-                   async_mode='eventlet',
                    logger=True,
                    engineio_logger=True,
                    ping_timeout=60,
@@ -48,8 +48,32 @@ def load_data():
         logger.info("Data file not found, creating new data structure")
         return {
             "users": {
-                "luu": {"points": 0, "sessions": []},
-                "4keni": {"points": 0, "sessions": []}
+                "luu": {
+                    "points": 0, 
+                    "sessions": [],
+                    "folders": [
+                        {
+                            "id": "luu_default",
+                            "name": "Default",
+                            "emoji": "📁",
+                            "parent_id": None,
+                            "chickens": []
+                        }
+                    ]
+                },
+                "4keni": {
+                    "points": 0, 
+                    "sessions": [],
+                    "folders": [
+                        {
+                            "id": "4keni_default",
+                            "name": "Default",
+                            "emoji": "📁",
+                            "parent_id": None,
+                            "chickens": []
+                        }
+                    ]
+                }
             },
             "cycle_start": datetime.datetime.now().isoformat(),
             "winner": None
@@ -243,12 +267,12 @@ def handle_start_chicken(json_data):
         active_timers[user]['current_session'] = session
         
         print(f"Starting chicken for '{user}': {task_name} (Tier {tier})")
-        emit('chicken_started', {
+        socketio.emit('chicken_started', {
             'user': user,
             'task_name': task_name,
             'tier': tier,
             'duration': duration
-        }, broadcast=True)
+        })
         
     except Exception as e:
         print(f"Error in start_chicken: {str(e)}")
@@ -259,7 +283,7 @@ def handle_pause_timer(json_data):
     user = json_data['user']
     if user in active_timers:
         active_timers[user]['stop'] = True
-        emit('timer_paused', {'user': user}, broadcast=True)
+        socketio.emit('timer_paused', {'user': user})
 
 @socketio.on('resume_timer')
 def handle_resume_timer(json_data):
@@ -268,7 +292,7 @@ def handle_resume_timer(json_data):
         duration = active_timers[user]['remaining']
         is_break = json_data.get('is_break', False)
         threading.Thread(target=timer_worker, args=(user, duration, is_break), daemon=True).start()
-        emit('timer_resumed', {'user': user}, broadcast=True)
+        socketio.emit('timer_resumed', {'user': user})
 
 @socketio.on('reset_timer')
 def handle_reset_timer(json_data):
@@ -278,7 +302,7 @@ def handle_reset_timer(json_data):
         if 'current_session' in active_timers[user]:
             del active_timers[user]['current_session']
     
-    emit('timer_reset', {'user': user}, broadcast=True)
+    socketio.emit('timer_reset', {'user': user})
 
 @socketio.on('timer_complete')
 def handle_timer_complete(json_data):
@@ -291,17 +315,50 @@ def handle_timer_complete(json_data):
         session = active_timers[user]['current_session']
         session['completed'] = True
         
+        # Add session to sessions list
         data["users"][user]["sessions"].append(session)
+        
+        # Create a chicken object with ID
+        chicken_id = f"{user}_chicken_{str(uuid.uuid4())[:8]}"
+        new_chicken = {
+            "id": chicken_id,
+            "task_name": session["task_name"],
+            "tier": session["tier"],
+            "timestamp": session["timestamp"],
+            "completed": True
+        }
+        
+        # Find default folder
+        default_folder = None
+        for folder in data["users"][user]["folders"]:
+            if folder["id"] == f"{user}_default":
+                default_folder = folder
+                break
+                
+        if not default_folder:
+            # Create default folder if doesn't exist
+            default_folder = {
+                "id": f"{user}_default",
+                "name": "Default",
+                "emoji": "📁",
+                "parent_id": None,
+                "chickens": []
+            }
+            data["users"][user]["folders"].append(default_folder)
+            
+        # Add chicken to default folder
+        default_folder["chickens"].append(new_chicken)
         save_data(data)
         
         # Start 5-minute break
         threading.Thread(target=timer_worker, args=(user, 300, True), daemon=True).start()
         
-        emit('break_started', {'user': user}, broadcast=True)
+        socketio.emit('break_started', {'user': user})
+        socketio.emit('chicken_created', {'user': user, 'chicken': new_chicken})
         emit_full_update(data)
     else:
         # Break complete, session fully done
-        emit('session_complete', {'user': user}, broadcast=True)
+        socketio.emit('session_complete', {'user': user})
 
 @socketio.on('end_cycle')
 def handle_end_cycle():
@@ -335,7 +392,7 @@ def end_cycle(data):
         'winner': winner,
         'luu_points': luu_points,
         'keni_points': keni_points
-    }, broadcast=True)
+    })
     
     emit_full_update(data)
 
@@ -356,7 +413,260 @@ def emit_full_update(data):
     days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
     data["days_remaining"] = max(0, days_remaining)
     
-    socketio.emit('full_update', data, broadcast=True)
+    socketio.emit('full_update', data)
+
+# Add folder management routes and socket events
+@socketio.on('create_folder')
+def handle_create_folder(json_data):
+    logger.info("create_folder request: %s", json_data)
+    try:
+        user = json_data.get('user')
+        folder_name = json_data.get('name', 'New Folder')
+        emoji = json_data.get('emoji', '')
+        parent_id = json_data.get('parent_id', None)
+        
+        if not user or user not in USERS:
+            emit('error', {'message': 'Invalid user'})
+            return
+            
+        data = load_data()
+        
+        # Create a new folder ID
+        folder_id = f"{user}_{str(uuid.uuid4())[:8]}"
+        
+        # Create the new folder
+        new_folder = {
+            "id": folder_id,
+            "name": folder_name,
+            "emoji": emoji,
+            "parent_id": parent_id,
+            "chickens": []
+        }
+        
+        # Add to user's folders
+        data["users"][user]["folders"].append(new_folder)
+        save_data(data)
+        
+        # Send updated folders to clients
+        socketio.emit('folders_updated', {"user": user, "folders": data["users"][user]["folders"]})
+        
+    except Exception as e:
+        logger.error("Error creating folder: %s", str(e))
+        emit('error', {'message': f'Error creating folder: {str(e)}'})
+
+@socketio.on('edit_folder')
+def handle_edit_folder(json_data):
+    logger.info("edit_folder request: %s", json_data)
+    try:
+        user = json_data.get('user')
+        folder_id = json_data.get('folder_id')
+        new_name = json_data.get('name')
+        new_emoji = json_data.get('emoji')
+        new_parent_id = json_data.get('parent_id')
+        
+        if not user or user not in USERS:
+            emit('error', {'message': 'Invalid user'})
+            return
+            
+        if not folder_id:
+            emit('error', {'message': 'Folder ID required'})
+            return
+            
+        data = load_data()
+        
+        # Find and update the folder
+        folder_found = False
+        for folder in data["users"][user]["folders"]:
+            if folder["id"] == folder_id:
+                if new_name is not None:
+                    folder["name"] = new_name
+                if new_emoji is not None:
+                    folder["emoji"] = new_emoji
+                if new_parent_id is not None:
+                    # Check for circular references
+                    if new_parent_id == folder_id:
+                        emit('error', {'message': 'Cannot set a folder as its own parent'})
+                        return
+                    
+                    # Check if parent exists
+                    parent_exists = False
+                    for potential_parent in data["users"][user]["folders"]:
+                        if potential_parent["id"] == new_parent_id:
+                            parent_exists = True
+                            break
+                    
+                    if parent_exists or new_parent_id is None:
+                        folder["parent_id"] = new_parent_id
+                    else:
+                        emit('error', {'message': 'Parent folder does not exist'})
+                        return
+                
+                folder_found = True
+                break
+        
+        if not folder_found:
+            emit('error', {'message': 'Folder not found'})
+            return
+            
+        save_data(data)
+        
+        # Send updated folders to clients
+        socketio.emit('folders_updated', {"user": user, "folders": data["users"][user]["folders"]})
+        
+    except Exception as e:
+        logger.error("Error editing folder: %s", str(e))
+        emit('error', {'message': f'Error editing folder: {str(e)}'})
+
+@socketio.on('delete_folder')
+def handle_delete_folder(json_data):
+    logger.info("delete_folder request: %s", json_data)
+    try:
+        user = json_data.get('user')
+        folder_id = json_data.get('folder_id')
+        
+        if not user or user not in USERS:
+            emit('error', {'message': 'Invalid user'})
+            return
+            
+        if not folder_id:
+            emit('error', {'message': 'Folder ID required'})
+            return
+            
+        # Don't allow deleting the default folder
+        if folder_id in [f"{user}_default"]:
+            emit('error', {'message': 'Cannot delete the default folder'})
+            return
+            
+        data = load_data()
+        
+        # Find the folder index
+        folder_index = None
+        for i, folder in enumerate(data["users"][user]["folders"]):
+            if folder["id"] == folder_id:
+                folder_index = i
+                break
+        
+        if folder_index is None:
+            emit('error', {'message': 'Folder not found'})
+            return
+        
+        # Get the chickens from this folder before removing it
+        chickens_to_move = data["users"][user]["folders"][folder_index]["chickens"]
+        
+        # Find the default folder
+        default_folder = None
+        for folder in data["users"][user]["folders"]:
+            if folder["id"] == f"{user}_default":
+                default_folder = folder
+                break
+        
+        if default_folder is None:
+            # Create a default folder if it doesn't exist
+            default_folder = {
+                "id": f"{user}_default",
+                "name": "Default",
+                "emoji": "📁",
+                "parent_id": None,
+                "chickens": []
+            }
+            data["users"][user]["folders"].append(default_folder)
+        
+        # Move chickens to default folder
+        default_folder["chickens"].extend(chickens_to_move)
+        
+        # Update any subfolders to point to parent's parent
+        parent_id = data["users"][user]["folders"][folder_index]["parent_id"]
+        for subfolder in data["users"][user]["folders"]:
+            if subfolder["parent_id"] == folder_id:
+                subfolder["parent_id"] = parent_id
+        
+        # Remove the folder
+        data["users"][user]["folders"].pop(folder_index)
+        save_data(data)
+        
+        # Send updated folders to clients
+        socketio.emit('folders_updated', {"user": user, "folders": data["users"][user]["folders"]})
+        
+    except Exception as e:
+        logger.error("Error deleting folder: %s", str(e))
+        emit('error', {'message': f'Error deleting folder: {str(e)}'})
+
+@socketio.on('move_chicken')
+def handle_move_chicken(json_data):
+    logger.info("move_chicken request: %s", json_data)
+    try:
+        user = json_data.get('user')
+        chicken_id = json_data.get('chicken_id')
+        target_folder_id = json_data.get('target_folder_id')
+        source_folder_id = json_data.get('source_folder_id')
+        
+        if not user or user not in USERS:
+            emit('error', {'message': 'Invalid user'})
+            return
+            
+        if not chicken_id:
+            emit('error', {'message': 'Chicken ID required'})
+            return
+            
+        if not target_folder_id:
+            emit('error', {'message': 'Target folder ID required'})
+            return
+            
+        data = load_data()
+        
+        # Find the source folder
+        source_folder = None
+        if source_folder_id:
+            for folder in data["users"][user]["folders"]:
+                if folder["id"] == source_folder_id:
+                    source_folder = folder
+                    break
+        else:
+            # If no source folder specified, search all folders
+            for folder in data["users"][user]["folders"]:
+                for chicken in folder["chickens"]:
+                    if chicken["id"] == chicken_id:
+                        source_folder = folder
+                        break
+                if source_folder:
+                    break
+        
+        if not source_folder:
+            emit('error', {'message': 'Source folder not found or chicken not found'})
+            return
+            
+        # Find the target folder
+        target_folder = None
+        for folder in data["users"][user]["folders"]:
+            if folder["id"] == target_folder_id:
+                target_folder = folder
+                break
+                
+        if not target_folder:
+            emit('error', {'message': 'Target folder not found'})
+            return
+            
+        # Find and remove the chicken from source folder
+        chicken = None
+        for i, chk in enumerate(source_folder["chickens"]):
+            if chk["id"] == chicken_id:
+                chicken = source_folder["chickens"].pop(i)
+                break
+                
+        if not chicken:
+            emit('error', {'message': 'Chicken not found in source folder'})
+            return
+            
+        # Add chicken to target folder
+        target_folder["chickens"].append(chicken)
+        save_data(data)
+        
+        # Send updated folders to clients
+        socketio.emit('folders_updated', {"user": user, "folders": data["users"][user]["folders"]})
+        
+    except Exception as e:
+        logger.error("Error moving chicken: %s", str(e))
+        emit('error', {'message': f'Error moving chicken: {str(e)}'})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
