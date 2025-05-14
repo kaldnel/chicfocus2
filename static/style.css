@@ -942,4 +942,39 @@ input:focus-visible {
 .keni-btn:hover {
     transform: scale(1.05);
     filter: drop-shadow(0 0 10px rgba(255, 107, 157, 0.6));
+}
+
+/* Connection status indicators */
+.connection-indicator {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: red;
+    z-index: 1000;
+}
+
+body.socket-connected .connection-indicator {
+    background-color: green;
+}
+
+/* Add a subtle visual cue when disconnected */
+body:not(.socket-connected) #main-app {
+    opacity: 0.8;
+    pointer-events: none;
+}
+
+body:not(.socket-connected):after {
+    content: 'Disconnected - Please refresh';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 0, 0, 0.7);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    z-index: 9999;
 } 

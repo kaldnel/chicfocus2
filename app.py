@@ -1,10 +1,16 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 import json
 import datetime
 import threading
 import time
 import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
@@ -12,7 +18,9 @@ socketio = SocketIO(app,
                    cors_allowed_origins="*",
                    async_mode='eventlet',
                    logger=True,
-                   engineio_logger=True)
+                   engineio_logger=True,
+                   ping_timeout=60,
+                   ping_interval=25)
 
 # Data storage
 DATA_FILE = 'data/chickens.json'
@@ -30,12 +38,14 @@ active_timers = {}
 
 def load_data():
     """Load existing data or create new structure"""
+    logger.debug("Loading data from %s", DATA_FILE)
     os.makedirs('data', exist_ok=True)
     
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'r') as f:
             return json.load(f)
     else:
+        logger.info("Data file not found, creating new data structure")
         return {
             "users": {
                 "luu": {"points": 0, "sessions": []},
@@ -130,16 +140,44 @@ def timer_worker(user, duration, is_break=False):
 def index():
     return render_template('index.html', users=USERS, chicken_types=CHICKEN_TYPES)
 
+@app.route('/status')
+def status():
+    logger.debug("Status endpoint called")
+    try:
+        data = load_data()
+        return jsonify({"status": "ok", "users": USERS, "chicken_types": CHICKEN_TYPES})
+    except Exception as e:
+        logger.error("Error in status: %s", str(e))
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/debug/emit/<event>')
+def debug_emit(event):
+    logger.debug("Debug emit endpoint called for event: %s", event)
+    try:
+        socketio.emit(event, {"message": f"Debug event {event}"})
+        return jsonify({"status": "ok", "message": f"Emitted {event}"})
+    except Exception as e:
+        logger.error("Error in debug_emit: %s", str(e))
+        return jsonify({"status": "error", "message": str(e)})
+
 @socketio.on('connect')
 def handle_connect():
-    data = load_data()
-    
-    # Check if 7-day cycle has passed
-    cycle_start = datetime.datetime.fromisoformat(data["cycle_start"])
-    if (datetime.datetime.now() - cycle_start).days >= 7:
-        end_cycle(data)
-    
-    emit_full_update(data)
+    logger.info("Client connected: %s", request.sid)
+    try:
+        data = load_data()
+        
+        # Check if 7-day cycle has passed
+        cycle_start = datetime.datetime.fromisoformat(data["cycle_start"])
+        if (datetime.datetime.now() - cycle_start).days >= 7:
+            end_cycle(data)
+        
+        emit_full_update(data)
+        
+        # Send confirmation of connection
+        emit('server_connected', {"status": "Connected to server"})
+    except Exception as e:
+        logger.error("Error in connect handler: %s", str(e))
+        emit('error', {'message': f'Connection error: {str(e)}'})
 
 @socketio.on('start_chicken')
 def handle_start_chicken(json_data):
