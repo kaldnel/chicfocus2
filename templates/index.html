@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChicFocus - Real-time Productivity Tracker</title>
+    <link id="user-stylesheet" rel="stylesheet" href="">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- User Selection Modal -->
+        <div id="user-modal" class="modal">
+            <div class="modal-content">
+                <h2>Select User</h2>
+                <button onclick="selectUser('luu')" class="user-btn">luu</button>
+                <button onclick="selectUser('4keni')" class="user-btn">4keni</button>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="main-app" class="hidden">
+            <header>
+                <h1>ChicFocus</h1>
+                <div class="user-info">
+                    <span id="current-user"></span>
+                    <button onclick="logout()" class="logout-btn">Logout</button>
+                </div>
+            </header>
+
+            <div class="split-container">
+                <!-- Left Side - Current User -->
+                <div class="user-panel" id="current-user-panel">
+                    <h2 id="current-user-name"></h2>
+                    
+                    <!-- Task Input -->
+                    <div class="task-section">
+                        <h3>Start New Chicken</h3>
+                        <input type="text" id="task-name" placeholder="Enter task name...">
+                        
+                        <div class="tier-selection">
+                            <h4>Choose Chicken Tier:</h4>
+                            {% for tier, info in chicken_types.items() %}
+                            <label class="tier-option">
+                                <input type="radio" name="tier" value="{{ tier }}" {% if tier == 1 %}checked{% endif %}>
+                                Tier {{ tier }} ({{ info.time }}min - {{ info.points }}pts)
+                            </label>
+                            {% endfor %}
+                        </div>
+                        
+                        <button id="start-btn" onclick="startChicken()">Start Chicken</button>
+                    </div>
+
+                    <!-- Timer -->
+                    <div class="timer-section">
+                        <div id="timer-display">00:00</div>
+                        <div id="timer-status">Ready to start</div>
+                        <div class="timer-controls">
+                            <button id="pause-btn" onclick="pauseTimer()" disabled>Pause</button>
+                            <button id="reset-btn" onclick="resetTimer()" disabled>Reset</button>
+                        </div>
+                    </div>
+
+                    <!-- Current User Stats -->
+                    <div class="stats-section">
+                        <h3>Your Stats</h3>
+                        <div id="current-stats">
+                            <div>Points: <span id="current-points">0</span></div>
+                            <div>Today's Chickens: <span id="current-sessions">0</span>/5</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Side - Partner -->
+                <div class="user-panel" id="partner-panel">
+                    <h2 id="partner-name"></h2>
+                    
+                    <!-- Partner Timer -->
+                    <div class="timer-section">
+                        <div id="partner-timer">00:00</div>
+                        <div id="partner-status">Idle</div>
+                    </div>
+
+                    <!-- Partner Stats -->
+                    <div class="stats-section">
+                        <h3>Partner Stats</h3>
+                        <div id="partner-stats">
+                            <div>Points: <span id="partner-points">0</span></div>
+                            <div>Today's Chickens: <span id="partner-sessions">0</span>/5</div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="activity-section">
+                        <h3>Recent Activity</h3>
+                        <div id="activity-log"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Section - Cycle Info and Log -->
+            <div class="bottom-section">
+                <div class="cycle-info">
+                    <span>Days remaining: <span id="days-remaining">7</span></span>
+                    <button onclick="endCycle()" class="end-cycle-btn">End Cycle</button>
+                </div>
+
+                <div class="full-log">
+                    <h3>Complete Log</h3>
+                    <div id="full-log"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUser = null;
+        let partnerUser = null;
+        let timerRunning = false;
+        let timerPaused = false;
+        let isBreak = false;
+
+        // User selection
+        function selectUser(user) {
+            currentUser = user;
+            partnerUser = user === 'luu' ? '4keni' : 'luu';
+            
+            // Load appropriate stylesheet
+            const stylesheet = document.getElementById('user-stylesheet');
+            stylesheet.href = `/static/style_${user}.css`;
+            
+            // Update UI
+            document.getElementById('user-modal').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            document.getElementById('current-user').textContent = user;
+            document.getElementById('current-user-name').textContent = user;
+            document.getElementById('partner-name').textContent = partnerUser;
+            
+            // Set panel classes for styling
+            document.getElementById('current-user-panel').className = `user-panel ${user}-theme`;
+            document.getElementById('partner-panel').className = `user-panel ${partnerUser === '4keni' ? 'keni' : partnerUser}-theme`;
+        }
+
+        function logout() {
+            document.getElementById('user-modal').classList.remove('hidden');
+            document.getElementById('main-app').classList.add('hidden');
+            currentUser = null;
+            partnerUser = null;
+        }
+
+        // Chicken management
+        function startChicken() {
+            const taskName = document.getElementById('task-name').value.trim();
+            const tier = document.querySelector('input[name="tier"]:checked').value;
+            
+            if (!taskName) {
+                alert('Please enter a task name!');
+                return;
+            }
+            
+            socket.emit('start_chicken', {
+                user: currentUser,
+                task_name: taskName,
+                tier: tier
+            });
+        }
+
+        function pauseTimer() {
+            if (!timerPaused) {
+                socket.emit('pause_timer', {user: currentUser});
+            } else {
+                socket.emit('resume_timer', {user: currentUser, is_break: isBreak});
+            }
+        }
+
+        function resetTimer() {
+            socket.emit('reset_timer', {user: currentUser});
+        }
+
+        function endCycle() {
+            if (confirm('Are you sure you want to end the current cycle?')) {
+                socket.emit('end_cycle');
+            }
+        }
+
+        // Socket event handlers
+        socket.on('chicken_started', (data) => {
+            if (data.user === currentUser) {
+                document.getElementById('timer-status').textContent = `Working on: ${data.task_name} (Tier ${data.tier})`;
+                document.getElementById('start-btn').disabled = true;
+                document.getElementById('pause-btn').disabled = false;
+                document.getElementById('reset-btn').disabled = false;
+                document.getElementById('task-name').value = '';
+                timerRunning = true;
+                isBreak = false;
+            } else {
+                document.getElementById('partner-status').textContent = `${data.task_name} (Tier ${data.tier})`;
+            }
+        });
+
+        socket.on('timer_update', (data) => {
+            if (data.user === currentUser) {
+                document.getElementById('timer-display').textContent = data.time;
+            } else {
+                document.getElementById('partner-timer').textContent = data.time;
+            }
+        });
+
+        socket.on('timer_paused', (data) => {
+            if (data.user === currentUser) {
+                document.getElementById('pause-btn').textContent = 'Resume';
+                timerPaused = true;
+            }
+        });
+
+        socket.on('timer_resumed', (data) => {
+            if (data.user === currentUser) {
+                document.getElementById('pause-btn').textContent = 'Pause';
+                timerPaused = false;
+            }
+        });
+
+        socket.on('timer_reset', (data) => {
+            if (data.user === currentUser) {
+                document.getElementById('timer-display').textContent = '00:00';
+                document.getElementById('timer-status').textContent = 'Ready to start';
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('pause-btn').disabled = true;
+                document.getElementById('reset-btn').disabled = true;
+                document.getElementById('pause-btn').textContent = 'Pause';
+                timerRunning = false;
+                timerPaused = false;
+                isBreak = false;
+            } else {
+                document.getElementById('partner-timer').textContent = '00:00';
+                document.getElementById('partner-status').textContent = 'Idle';
+            }
+        });
+
+        socket.on('break_started', (data) => {
+            if (data.user === currentUser) {
+                document.getElementById('timer-status').textContent = 'Break time! 🐥';
+                isBreak = true;
+            } else {
+                document.getElementById('partner-status').textContent = 'On break 🐥';
+            }
+        });
+
+        socket.on('session_complete', (data) => {
+            if (data.user === currentUser) {
+                document.getElementById('timer-display').textContent = '00:00';
+                document.getElementById('timer-status').textContent = 'Session completed! 🎉';
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('pause-btn').disabled = true;
+                document.getElementById('reset-btn').disabled = true;
+                document.getElementById('pause-btn').textContent = 'Pause';
+                timerRunning = false;
+                timerPaused = false;
+                isBreak = false;
+                alert('Great job! Your chicken is done. 🐥');
+            } else {
+                document.getElementById('partner-timer').textContent = '00:00';
+                document.getElementById('partner-status').textContent = 'Completed session 🎉';
+            }
+        });
+
+        socket.on('full_update', (data) => {
+            if (!currentUser) return;
+            
+            // Update current user stats
+            document.getElementById('current-points').textContent = data.users[currentUser].current_points;
+            document.getElementById('current-sessions').textContent = data.users[currentUser].sessions_today;
+            
+            // Update partner stats
+            document.getElementById('partner-points').textContent = data.users[partnerUser].current_points;
+            document.getElementById('partner-sessions').textContent = data.users[partnerUser].sessions_today;
+            
+            // Update cycle info
+            document.getElementById('days-remaining').textContent = data.days_remaining;
+            
+            // Update activity log
+            updateActivityLog(data);
+            updateFullLog(data);
+        });
+
+        socket.on('cycle_complete', (data) => {
+            let message;
+            if (data.winner === 'Tie') {
+                message = `It's a tie! Both users have the same points.\nYou'll need to decide together who chooses the next date!`;
+            } else {
+                message = `🎉 ${data.winner} wins!\n\n${data.winner} gets to choose who picks the next date activity.`;
+            }
+            alert(message);
+        });
+
+        socket.on('error', (data) => {
+            alert(data.message);
+        });
+
+        function updateActivityLog(data) {
+            const partnerSessions = data.users[partnerUser].sessions;
+            const recent = partnerSessions.slice(-5).reverse();
+            
+            const logHtml = recent.map(session => {
+                const date = new Date(session.timestamp);
+                const timeStr = date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'});
+                return `<div class="log-entry">
+                    <span class="task-name">${session.task_name}</span>
+                    <span class="tier">Tier ${session.tier}</span>
+                    <span class="time">${timeStr}</span>
+                </div>`;
+            }).join('');
+            
+            document.getElementById('activity-log').innerHTML = logHtml;
+        }
+
+        function updateFullLog(data) {
+            const allSessions = [];
+            
+            for (const [user, userData] of Object.entries(data.users)) {
+                for (const session of userData.sessions) {
+                    allSessions.push({...session, user});
+                }
+            }
+            
+            allSessions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            const logHtml = allSessions.slice(0, 20).map(session => {
+                const date = new Date(session.timestamp);
+                const timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'});
+                return `<div class="log-entry full">
+                    <span class="user ${session.user}">${session.user}</span>
+                    <span class="task-name">${session.task_name}</span>
+                    <span class="tier">Tier ${session.tier}</span>
+                    <span class="time">${timeStr}</span>
+                </div>`;
+            }).join('');
+            
+            document.getElementById('full-log').innerHTML = logHtml;
+        }
+    </script>
+</body>
+</html> 
