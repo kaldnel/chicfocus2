@@ -21,10 +21,16 @@
         <!-- Main App -->
         <div id="main-app" class="hidden">
             <header>
-                <h1>ChicFocus</h1>
-                <div class="user-info">
-                    <span id="current-user"></span>
-                    <button onclick="logout()" class="logout-btn">Logout</button>
+                <div class="panel-header">
+                    <!-- Add logo image here -->
+                    <div class="header-logo">
+                        <img src="{{ url_for('static', filename='images/logo.png') }}" alt="ChicFocus Logo">
+                    </div>
+                    <h1>ChicFocus</h1>
+                    <div class="user-info">
+                        <span id="current-user"></span>
+                        <button onclick="logout()" class="logout-btn">Logout</button>
+                    </div>
                 </div>
             </header>
 

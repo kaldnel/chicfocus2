@@ -210,6 +210,9 @@ body {
 .app-container {
     display: flex;
     min-height: 100vh;
+    background-image: url('/static/images/background.jpg');
+    background-size: cover;
+    background-position: center;
 }
 
 /* Panel styles */
@@ -226,8 +229,12 @@ body {
 .luu-panel {
     background: var(--luu-bg);
     background-image: 
+        url('/static/images/luu-bg.png'),
         radial-gradient(circle at 20% 50%, rgba(0, 255, 65, 0.03) 0%, transparent 50%),
         radial-gradient(circle at 80% 50%, rgba(0, 255, 65, 0.03) 0%, transparent 50%);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
     border-right: 1px solid var(--luu-border);
     font-family: 'Roboto Mono', monospace;
 }

@@ -1,0 +1,6 @@
+This is a placeholder. Replace this file with actual image files (PNG, JPG, GIF, etc.).
+
+To add an image:
+1. Delete this file
+2. Add your image files to this folder
+3. Use them in your HTML with: <img src="/static/images/your-image.jpg"> 
