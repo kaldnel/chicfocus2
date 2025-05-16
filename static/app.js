@@ -1,10 +1,14 @@
 // Initialize socket with error handling
 const socket = io({
     reconnection: true,
-    reconnectionAttempts: 10,
+    reconnectionAttempts: Infinity,  // Always try to reconnect
     reconnectionDelay: 1000,
-    timeout: 30000,
-    transports: ['websocket', 'polling']
+    reconnectionDelayMax: 5000,
+    timeout: 60000,  // Longer timeout
+    transports: ['websocket', 'polling'],
+    forceNew: false,
+    pingInterval: 5000,  // Match server settings
+    pingTimeout: 180000  // Match server settings
 });
 
 // State variables
@@ -19,18 +23,62 @@ let activeTimers = {
 socket.on('connect', () => {
     console.log('Socket connected! ID:', socket.id);
     document.body.classList.add('socket-connected');
+    
+    // If we were disconnected and reconnected, try to get the latest data
+    if (currentUser) {
+        console.log('Reconnected, requesting data refresh...');
+        // Optional: Request a full data refresh from the server
+        // socket.emit('request_refresh', { user: currentUser });
+    }
 });
 
 socket.on('disconnect', (reason) => {
     console.error('Socket disconnected:', reason);
     document.body.classList.remove('socket-connected');
-    alert('Disconnected from server: ' + reason + '. Please refresh the page.');
+    
+    // Don't alert on normal disconnections or page unload
+    if (reason !== 'io client disconnect' && reason !== 'transport close') {
+        // Show a non-intrusive message instead of an alert
+        const statusEl = document.createElement('div');
+        statusEl.className = 'disconnection-notice';
+        statusEl.textContent = 'Connection lost. Attempting to reconnect...';
+        document.body.appendChild(statusEl);
+        
+        // Remove the message after 5 seconds or when reconnected
+        setTimeout(() => {
+            if (document.body.contains(statusEl)) {
+                document.body.removeChild(statusEl);
+            }
+        }, 5000);
+    }
+});
+
+socket.on('reconnect', (attemptNumber) => {
+    console.log(`Reconnected after ${attemptNumber} attempts`);
+    document.body.classList.add('socket-connected');
+    
+    // Remove any disconnection notices
+    const notices = document.querySelectorAll('.disconnection-notice');
+    notices.forEach(notice => document.body.removeChild(notice));
+    
+    // If user was logged in, try to restore their session
+    if (currentUser) {
+        console.log('Trying to restore session after reconnection');
+    }
+});
+
+socket.on('reconnect_attempt', (attemptNumber) => {
+    console.log(`Reconnection attempt ${attemptNumber}`);
 });
 
 socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error);
     document.body.classList.remove('socket-connected');
-    alert('Connection error: ' + error.message + '. Please refresh the page.');
+    
+    // Only show an alert if we've tried to reconnect several times
+    if (socket.io.reconnectionAttempts > 5) {
+        alert(`Connection error: ${error.message}. Please refresh the page.`);
+    }
 });
 
 socket.on('server_connected', (data) => {

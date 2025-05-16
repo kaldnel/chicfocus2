@@ -23,16 +23,17 @@ if os.path.exists('render.env') and not os.environ.get('RENDER'):
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
 
-# Single SocketIO configuration that works in both environments
+# Socket.IO configuration with auto-detection of async mode
 # Keep ping interval short to prevent disconnections
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='threading',  # Explicitly set this for Windows
+    # Let Socket.IO detect the best async mode automatically
+    # Windows will use threading, Render will use eventlet
     logger=True,
     engineio_logger=True,
-    ping_timeout=120,  # Longer timeout
-    ping_interval=10   # More frequent pings to keep connection alive
+    ping_timeout=180,  # Increase timeout to prevent disconnects
+    ping_interval=5    # More frequent pings to maintain connection
 )
 
 # Data storage
@@ -133,27 +134,40 @@ def timer_worker(user, duration, is_break=False):
     """Run timer in separate thread"""
     if user in active_timers:
         active_timers[user]['stop'] = True
+        # Give time for the previous timer to stop
+        time.sleep(0.5)
     
     active_timers[user] = {'stop': False, 'remaining': duration}
     
     while duration > 0 and not active_timers[user]['stop']:
         minutes, seconds = divmod(duration, 60)
-        socketio.emit('timer_update', {
-            'user': user,
-            'time': f"{minutes:02d}:{seconds:02d}",
-            'remaining': duration,
-            'is_break': is_break
-        })
+        try:
+            # Emit timer update to all clients
+            socketio.emit('timer_update', {
+                'user': user,
+                'time': f"{minutes:02d}:{seconds:02d}",
+                'remaining': duration,
+                'is_break': is_break
+            })
+        except Exception as e:
+            print(f"Error emitting timer update: {str(e)}")
+            # Continue the timer even if we can't emit updates
+            # The client will catch up when it can
         
         time.sleep(1)
         duration -= 1
         active_timers[user]['remaining'] = duration
     
     if not active_timers[user]['stop']:
-        socketio.emit('timer_complete', {
-            'user': user,
-            'is_break': is_break
-        })
+        try:
+            # Timer complete - emit to all clients
+            socketio.emit('timer_complete', {
+                'user': user,
+                'is_break': is_break
+            })
+        except Exception as e:
+            print(f"Error emitting timer complete: {str(e)}")
+            # If we can't emit, the client will catch up on reconnect
 
 @app.route('/')
 def index():
@@ -407,7 +421,7 @@ def handle_timer_complete(json_data):
             days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
             data["days_remaining"] = max(0, days_remaining)
             
-            # Send a full update to the client
+            # Send a full update to all clients
             socketio.emit('full_update', data)
             
             # Emit session_complete event
@@ -463,7 +477,7 @@ def end_cycle(data):
     days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
     data["days_remaining"] = max(0, days_remaining)
     
-    # Send a full update to the client
+    # Send a full update to all clients
     socketio.emit('full_update', data)
 
 if __name__ == '__main__':

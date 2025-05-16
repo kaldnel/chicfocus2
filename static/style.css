@@ -886,6 +886,26 @@ body.socket-connected .connection-indicator {
     background-color: #4caf50;
 }
 
+/* Disconnection notice */
+.disconnection-notice {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(211, 47, 47, 0.9);
+    color: white;
+    text-align: center;
+    padding: 10px;
+    font-weight: 500;
+    z-index: 2000;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+}
+
 /* Responsive design */
 @media (max-width: 992px) {
     .split-screen {
