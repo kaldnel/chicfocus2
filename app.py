@@ -24,13 +24,15 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
 
 # Single SocketIO configuration that works in both environments
+# Keep ping interval short to prevent disconnections
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
+    async_mode='threading',  # Explicitly set this for Windows
     logger=True,
     engineio_logger=True,
-    ping_timeout=60,
-    ping_interval=25
+    ping_timeout=120,  # Longer timeout
+    ping_interval=10   # More frequent pings to keep connection alive
 )
 
 # Data storage
@@ -212,6 +214,18 @@ def handle_connect():
         logger.error("Error in connect handler: %s", str(e))
         emit('error', {'message': f'Connection error: {str(e)}'})
 
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info("Client disconnected: %s", request.sid)
+    
+    # Let's check if this was an unexpected disconnect
+    # In production, you might want to store this info for debugging
+    if request.sid in active_timers:
+        logger.warning("Client disconnected with active timer: %s", request.sid)
+    
+    # You could also notify other clients about the disconnect if needed
+    # socketio.emit('user_disconnected', {'sid': request.sid})
+
 @socketio.on('start_chicken')
 def handle_start_chicken(json_data):
     print(f"Received start_chicken event with data: {json_data}")
@@ -231,11 +245,23 @@ def handle_start_chicken(json_data):
         print("Error: Missing tier in start_chicken data")
         emit('error', {'message': 'Missing tier data'})
         return
+        
+    if 'current_user' not in json_data or not json_data['current_user']:
+        print("Error: Missing current_user in start_chicken data")
+        emit('error', {'message': 'Missing current user data'})
+        return
     
     try:
         user = json_data['user']
+        current_user = json_data['current_user']
         task_name = json_data['task_name']
         tier = int(json_data['tier'])
+        
+        # Check that user is only controlling their own side
+        if user != current_user:
+            print(f"Error: User {current_user} tried to control {user}'s timer")
+            emit('error', {'message': f'You can only control your own timer'})
+            return
         
         if user not in USERS:
             print(f"Error: Invalid user '{user}'")
@@ -291,19 +317,43 @@ def handle_start_chicken(json_data):
 @socketio.on('pause_timer')
 def handle_pause_timer(json_data):
     user = json_data.get('user')
+    current_user = json_data.get('current_user')
+    
+    # Check that user is only controlling their own side
+    if user != current_user:
+        print(f"Error: User {current_user} tried to control {user}'s timer")
+        emit('error', {'message': f'You can only control your own timer'})
+        return
+        
     if user in active_timers:
         socketio.emit('timer_paused', {'user': user})
 
 @socketio.on('resume_timer')
 def handle_resume_timer(json_data):
     user = json_data.get('user')
+    current_user = json_data.get('current_user')
     is_break = json_data.get('is_break', False)
+    
+    # Check that user is only controlling their own side
+    if user != current_user:
+        print(f"Error: User {current_user} tried to control {user}'s timer")
+        emit('error', {'message': f'You can only control your own timer'})
+        return
+        
     if user in active_timers:
         socketio.emit('timer_resumed', {'user': user, 'is_break': is_break})
 
 @socketio.on('reset_timer')
 def handle_reset_timer(json_data):
     user = json_data.get('user')
+    current_user = json_data.get('current_user')
+    
+    # Check that user is only controlling their own side
+    if user != current_user:
+        print(f"Error: User {current_user} tried to control {user}'s timer")
+        emit('error', {'message': f'You can only control your own timer'})
+        return
+        
     if user in active_timers:
         active_timers[user]['stop'] = True
         socketio.emit('timer_reset', {'user': user})

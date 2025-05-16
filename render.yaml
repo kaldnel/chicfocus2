@@ -5,10 +5,18 @@ services:
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn -c gunicorn_config.py app:app
+    healthCheckPath: /status
     envVars:
       - key: RENDER
         value: true
       - key: SECRET_KEY
         generateValue: true
       - key: PYTHON_VERSION
-        value: 3.11.2 
+        value: 3.11.2
+    headers:
+      - path: /*
+        name: Connection
+        value: keep-alive
+      - path: /*
+        name: Keep-Alive
+        value: timeout=120 

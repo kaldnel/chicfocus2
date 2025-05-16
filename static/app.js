@@ -107,7 +107,8 @@ function startChicken(user) {
     socket.emit('start_chicken', {
         user: user,
         task_name: taskName,
-        tier: tier
+        tier: tier,
+        current_user: currentUser
     });
     
     console.log(`Starting chicken for ${user} - Task: ${taskName}, Tier: ${tier}`);
@@ -121,9 +122,16 @@ function pauseTimer(user) {
     }
     
     if (activeTimers[user].isPaused) {
-        socket.emit('resume_timer', {user: user, is_break: activeTimers[user].isBreak});
+        socket.emit('resume_timer', {
+            user: user, 
+            is_break: activeTimers[user].isBreak,
+            current_user: currentUser
+        });
     } else {
-        socket.emit('pause_timer', {user: user});
+        socket.emit('pause_timer', {
+            user: user,
+            current_user: currentUser
+        });
     }
 }
 
@@ -133,7 +141,10 @@ function resetTimer(user) {
         return;
     }
     
-    socket.emit('reset_timer', {user: user});
+    socket.emit('reset_timer', {
+        user: user,
+        current_user: currentUser
+    });
 }
 
 function endCycle() {
