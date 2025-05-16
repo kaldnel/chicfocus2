@@ -23,16 +23,14 @@ if os.path.exists('render.env') and not os.environ.get('RENDER'):
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
 
-# Socket.IO configuration with async_mode explicitly set to threading for Windows
-# Keep ping interval short to prevent disconnections
+# Socket.IO configuration - removed async_mode for auto-detection
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='threading',  # Explicitly set for Windows compatibility
     logger=True,
     engineio_logger=True,
-    ping_timeout=180,  # Increase timeout to prevent disconnects
-    ping_interval=5    # More frequent pings to maintain connection
+    ping_timeout=180,
+    ping_interval=5
 )
 
 # Data storage
@@ -222,7 +220,7 @@ def handle_connect():
         days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
         data["days_remaining"] = max(0, days_remaining)
         
-        # Send data to this client only (no broadcast parameter)
+        # Explicitly send to just this client - fixed broadcast parameter issue
         emit('full_update', data)
     except Exception as e:
         logger.error("Error in connect handler: %s", str(e))
@@ -459,7 +457,7 @@ def end_cycle(data):
     
     save_data(data)
     
-    # Emit cycle_complete event
+    # Emit cycle_complete event - without broadcast parameter
     socketio.emit('cycle_complete', {'winner': winner})
     
     # Calculate updated data
@@ -477,7 +475,7 @@ def end_cycle(data):
     days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
     data["days_remaining"] = max(0, days_remaining)
     
-    # Send a full update to all clients
+    # Send a full update to all clients - without broadcast parameter
     socketio.emit('full_update', data)
 
 if __name__ == '__main__':
