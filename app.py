@@ -1,29 +1,51 @@
-from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit
+import os
 import json
 import datetime
 import threading
 import time
-import os
 import logging
-import uuid
-import eventlet
-eventlet.monkey_patch()
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+# Load environment variables from file in development
+if os.path.exists('render.env') and not os.environ.get('RENDER'):
+    with open('render.env') as f:
+        for line in f:
+            if line.strip() and not line.startswith('#'):
+                key, value = line.strip().split('=', 1)
+                os.environ[key] = value
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
-socketio = SocketIO(app, 
-                   cors_allowed_origins="*",
-                   async_mode='eventlet',
-                   logger=True,
-                   engineio_logger=True,
-                   ping_timeout=60,
-                   ping_interval=25)
+
+# Configure SocketIO with different modes for development vs production
+if os.environ.get('RENDER', False):
+    # Production mode (on Render.com) - use eventlet
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins="*",
+        async_mode=None,  # Let it auto-detect
+        logger=True,
+        engineio_logger=True,
+        ping_timeout=60,
+        ping_interval=25
+    )
+else:
+    # Development mode - use threading
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins="*",
+        async_mode=None,  # Let it auto-detect
+        logger=True,
+        engineio_logger=True,
+        ping_timeout=60,
+        ping_interval=25
+    )
 
 # Data storage
 DATA_FILE = 'data/chickens.json'
@@ -53,29 +75,11 @@ def load_data():
             "users": {
                 "luu": {
                     "points": 0, 
-                    "sessions": [],
-                    "folders": [
-                        {
-                            "id": "luu_default",
-                            "name": "Default",
-                            "emoji": "📁",
-                            "parent_id": None,
-                            "chickens": []
-                        }
-                    ]
+                    "sessions": []
                 },
                 "4keni": {
                     "points": 0, 
-                    "sessions": [],
-                    "folders": [
-                        {
-                            "id": "4keni_default",
-                            "name": "Default",
-                            "emoji": "📁",
-                            "parent_id": None,
-                            "chickens": []
-                        }
-                    ]
+                    "sessions": []
                 }
             },
             "cycle_start": datetime.datetime.now().isoformat(),
@@ -198,10 +202,26 @@ def handle_connect():
         if (datetime.datetime.now() - cycle_start).days >= 7:
             end_cycle(data)
         
-        emit_full_update(data)
-        
-        # Send confirmation of connection
+        # Send confirmation of connection first
         emit('server_connected', {"status": "Connected to server"})
+        
+        # Calculate and add the necessary data
+        for user in USERS:
+            points = calculate_points(user, data)
+            data["users"][user]["current_points"] = points
+            
+            # Get today's sessions
+            sessions_today = len([s for s in data["users"][user]["sessions"] 
+                               if datetime.datetime.fromisoformat(s["timestamp"]).date() == datetime.date.today()])
+            data["users"][user]["sessions_today"] = sessions_today
+        
+        # Calculate days remaining
+        cycle_start = datetime.datetime.fromisoformat(data["cycle_start"])
+        days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
+        data["days_remaining"] = max(0, days_remaining)
+        
+        # Send the data directly without using broadcast
+        emit('full_update', data)
     except Exception as e:
         logger.error("Error in connect handler: %s", str(e))
         emit('error', {'message': f'Connection error: {str(e)}'})
@@ -248,120 +268,117 @@ def handle_start_chicken(json_data):
                           if datetime.datetime.fromisoformat(s["timestamp"]).date() == datetime.date.today()])
         
         if sessions_today >= 5:
-            print(f"Error: Daily limit reached for user '{user}'")
-            emit('error', {'message': 'Daily limit of 5 chickens reached!'})
+            emit('error', {'message': 'Daily limit reached (5 chickens per day)'})
             return
         
-        # Create session object
+        # Create a new chicken session
         session = {
+            "id": str(time.time()),  # Simple ID based on timestamp
+            "user": user,
             "task_name": task_name,
             "tier": tier,
             "timestamp": datetime.datetime.now().isoformat(),
             "completed": False
         }
         
-        # Start timer
-        duration = CHICKEN_TYPES[tier]["time"] * 60
-        threading.Thread(target=timer_worker, args=(user, duration), daemon=True).start()
+        # Add to user's sessions
+        data["users"][user]["sessions"].append(session)
+        save_data(data)
         
-        # Store session temporarily (will be completed when timer ends)
-        if user not in active_timers:
-            active_timers[user] = {}
-        active_timers[user]['current_session'] = session
-        
-        print(f"Starting chicken for '{user}': {task_name} (Tier {tier})")
+        # Emit chicken_started event to all clients
         socketio.emit('chicken_started', {
             'user': user,
             'task_name': task_name,
-            'tier': tier,
-            'duration': duration
+            'tier': tier
         })
+        
+        # Start timer
+        duration = CHICKEN_TYPES[tier]["time"] * 60  # Convert minutes to seconds
+        timer_thread = threading.Thread(target=timer_worker, args=(user, duration))
+        timer_thread.daemon = True
+        timer_thread.start()
         
     except Exception as e:
         print(f"Error in start_chicken: {str(e)}")
-        emit('error', {'message': f'Server error: {str(e)}'})
+        emit('error', {'message': f'Error starting chicken: {str(e)}'})
 
 @socketio.on('pause_timer')
 def handle_pause_timer(json_data):
-    user = json_data['user']
+    user = json_data.get('user')
     if user in active_timers:
-        active_timers[user]['stop'] = True
         socketio.emit('timer_paused', {'user': user})
 
 @socketio.on('resume_timer')
 def handle_resume_timer(json_data):
-    user = json_data['user']
-    if user in active_timers and 'remaining' in active_timers[user]:
-        duration = active_timers[user]['remaining']
-        is_break = json_data.get('is_break', False)
-        threading.Thread(target=timer_worker, args=(user, duration, is_break), daemon=True).start()
-        socketio.emit('timer_resumed', {'user': user})
+    user = json_data.get('user')
+    is_break = json_data.get('is_break', False)
+    if user in active_timers:
+        socketio.emit('timer_resumed', {'user': user, 'is_break': is_break})
 
 @socketio.on('reset_timer')
 def handle_reset_timer(json_data):
-    user = json_data['user']
+    user = json_data.get('user')
     if user in active_timers:
         active_timers[user]['stop'] = True
-        if 'current_session' in active_timers[user]:
-            del active_timers[user]['current_session']
-    
-    socketio.emit('timer_reset', {'user': user})
+        socketio.emit('timer_reset', {'user': user})
 
 @socketio.on('timer_complete')
 def handle_timer_complete(json_data):
-    user = json_data['user']
+    user = json_data.get('user')
     is_break = json_data.get('is_break', False)
     
-    if not is_break:
-        # Complete chicken, start break
+    try:
+        if is_break:
+            # Break complete, redirect to main timer reset
+            socketio.emit('timer_reset', {'user': user})
+            return
+        
         data = load_data()
-        session = active_timers[user]['current_session']
-        session['completed'] = True
         
-        # Add session to sessions list
-        data["users"][user]["sessions"].append(session)
-        
-        # Create a chicken object with ID
-        chicken_id = f"{user}_chicken_{str(uuid.uuid4())[:8]}"
-        new_chicken = {
-            "id": chicken_id,
-            "task_name": session["task_name"],
-            "tier": session["tier"],
-            "timestamp": session["timestamp"],
-            "completed": True
-        }
-        
-        # Find default folder
-        default_folder = None
-        for folder in data["users"][user]["folders"]:
-            if folder["id"] == f"{user}_default":
-                default_folder = folder
+        # Find the active session for this user
+        active_session = None
+        for session in data["users"][user]["sessions"]:
+            if not session.get("completed", False):
+                active_session = session
                 break
                 
-        if not default_folder:
-            # Create default folder if doesn't exist
-            default_folder = {
-                "id": f"{user}_default",
-                "name": "Default",
-                "emoji": "📁",
-                "parent_id": None,
-                "chickens": []
-            }
-            data["users"][user]["folders"].append(default_folder)
+        if active_session:
+            # Mark the session as completed
+            active_session["completed"] = True
+            active_session["completion_time"] = datetime.datetime.now().isoformat()
+            save_data(data)
             
-        # Add chicken to default folder
-        default_folder["chickens"].append(new_chicken)
-        save_data(data)
-        
-        # Start 5-minute break
-        threading.Thread(target=timer_worker, args=(user, 300, True), daemon=True).start()
-        
-        socketio.emit('break_started', {'user': user})
-        socketio.emit('chicken_created', {'user': user, 'chicken': new_chicken})
-        emit_full_update(data)
-    else:
-        # Break complete, session fully done
-        socketio.emit('session_complete', {'user': user})
+            # Start a break timer (5 minutes)
+            break_duration = 5 * 60  # 5 minutes in seconds
+            socketio.emit('break_started', {'user': user})
+            
+            timer_thread = threading.Thread(target=timer_worker, args=(user, break_duration, True))
+            timer_thread.daemon = True
+            timer_thread.start()
+            
+            # Calculate updated data
+            for u in USERS:
+                points = calculate_points(u, data)
+                data["users"][u]["current_points"] = points
+                
+                # Get today's sessions
+                sessions_today = len([s for s in data["users"][u]["sessions"] 
+                                   if datetime.datetime.fromisoformat(s["timestamp"]).date() == datetime.date.today()])
+                data["users"][u]["sessions_today"] = sessions_today
+            
+            # Calculate days remaining
+            cycle_start = datetime.datetime.fromisoformat(data["cycle_start"])
+            days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
+            data["days_remaining"] = max(0, days_remaining)
+            
+            # Send a full update to the client
+            socketio.emit('full_update', data)
+            
+            # Emit session_complete event
+            socketio.emit('session_complete', {'user': user})
+    except Exception as e:
+        print(f"Error in timer_complete: {str(e)}")
+        emit('error', {'message': f'Error completing timer: {str(e)}'})
 
 @socketio.on('end_cycle')
 def handle_end_cycle():
@@ -369,46 +386,40 @@ def handle_end_cycle():
     end_cycle(data)
 
 def end_cycle(data):
-    """End current 7-day cycle and determine winner"""
-    luu_points = calculate_points("luu", data)
-    keni_points = calculate_points("4keni", data)
+    """End the current 7-day cycle and determine a winner"""
+    # Calculate points for each user
+    luu_points = calculate_points('luu', data)
+    keni_points = calculate_points('4keni', data)
     
+    # Determine winner
     if luu_points > keni_points:
-        winner = "luu"
+        winner = 'luu'
     elif keni_points > luu_points:
-        winner = "4keni"
+        winner = '4keni'
     else:
-        winner = "Tie"
+        winner = 'Tie'
+        
+    # Update data
+    data["winner"] = winner
+    data["cycle_start"] = datetime.datetime.now().isoformat()
     
-    # Reset cycle
-    data = {
-        "users": {
-            "luu": {"points": 0, "sessions": []},
-            "4keni": {"points": 0, "sessions": []}
-        },
-        "cycle_start": datetime.datetime.now().isoformat(),
-        "winner": winner
-    }
+    # Reset points
+    for user in USERS:
+        data["users"][user]["points"] = 0
+    
     save_data(data)
     
-    socketio.emit('cycle_complete', {
-        'winner': winner,
-        'luu_points': luu_points,
-        'keni_points': keni_points
-    })
+    # Emit cycle_complete event
+    socketio.emit('cycle_complete', {'winner': winner})
     
-    emit_full_update(data)
-
-def emit_full_update(data):
-    """Emit complete data update to all clients"""
-    # Calculate points for display
+    # Calculate updated data
     for user in USERS:
         points = calculate_points(user, data)
         data["users"][user]["current_points"] = points
         
         # Get today's sessions
         sessions_today = len([s for s in data["users"][user]["sessions"] 
-                            if datetime.datetime.fromisoformat(s["timestamp"]).date() == datetime.date.today()])
+                          if datetime.datetime.fromisoformat(s["timestamp"]).date() == datetime.date.today()])
         data["users"][user]["sessions_today"] = sessions_today
     
     # Calculate days remaining
@@ -416,265 +427,21 @@ def emit_full_update(data):
     days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
     data["days_remaining"] = max(0, days_remaining)
     
+    # Send a full update to the client
     socketio.emit('full_update', data)
 
-# Add folder management routes and socket events
-@socketio.on('create_folder')
-def handle_create_folder(json_data):
-    logger.info("create_folder request: %s", json_data)
-    try:
-        user = json_data.get('user')
-        folder_name = json_data.get('name', 'New Folder')
-        emoji = json_data.get('emoji', '')
-        parent_id = json_data.get('parent_id', None)
-        
-        if not user or user not in USERS:
-            emit('error', {'message': 'Invalid user'})
-            return
-            
-        data = load_data()
-        
-        # Create a new folder ID
-        folder_id = f"{user}_{str(uuid.uuid4())[:8]}"
-        
-        # Create the new folder
-        new_folder = {
-            "id": folder_id,
-            "name": folder_name,
-            "emoji": emoji,
-            "parent_id": parent_id,
-            "chickens": []
-        }
-        
-        # Add to user's folders
-        data["users"][user]["folders"].append(new_folder)
-        save_data(data)
-        
-        # Send updated folders to clients
-        socketio.emit('folders_updated', {"user": user, "folders": data["users"][user]["folders"]})
-        
-    except Exception as e:
-        logger.error("Error creating folder: %s", str(e))
-        emit('error', {'message': f'Error creating folder: {str(e)}'})
-
-@socketio.on('edit_folder')
-def handle_edit_folder(json_data):
-    logger.info("edit_folder request: %s", json_data)
-    try:
-        user = json_data.get('user')
-        folder_id = json_data.get('folder_id')
-        new_name = json_data.get('name')
-        new_emoji = json_data.get('emoji')
-        new_parent_id = json_data.get('parent_id')
-        
-        if not user or user not in USERS:
-            emit('error', {'message': 'Invalid user'})
-            return
-            
-        if not folder_id:
-            emit('error', {'message': 'Folder ID required'})
-            return
-            
-        data = load_data()
-        
-        # Find and update the folder
-        folder_found = False
-        for folder in data["users"][user]["folders"]:
-            if folder["id"] == folder_id:
-                if new_name is not None:
-                    folder["name"] = new_name
-                if new_emoji is not None:
-                    folder["emoji"] = new_emoji
-                if new_parent_id is not None:
-                    # Check for circular references
-                    if new_parent_id == folder_id:
-                        emit('error', {'message': 'Cannot set a folder as its own parent'})
-                        return
-                    
-                    # Check if parent exists
-                    parent_exists = False
-                    for potential_parent in data["users"][user]["folders"]:
-                        if potential_parent["id"] == new_parent_id:
-                            parent_exists = True
-                            break
-                    
-                    if parent_exists or new_parent_id is None:
-                        folder["parent_id"] = new_parent_id
-                    else:
-                        emit('error', {'message': 'Parent folder does not exist'})
-                        return
-                
-                folder_found = True
-                break
-        
-        if not folder_found:
-            emit('error', {'message': 'Folder not found'})
-            return
-            
-        save_data(data)
-        
-        # Send updated folders to clients
-        socketio.emit('folders_updated', {"user": user, "folders": data["users"][user]["folders"]})
-        
-    except Exception as e:
-        logger.error("Error editing folder: %s", str(e))
-        emit('error', {'message': f'Error editing folder: {str(e)}'})
-
-@socketio.on('delete_folder')
-def handle_delete_folder(json_data):
-    logger.info("delete_folder request: %s", json_data)
-    try:
-        user = json_data.get('user')
-        folder_id = json_data.get('folder_id')
-        
-        if not user or user not in USERS:
-            emit('error', {'message': 'Invalid user'})
-            return
-            
-        if not folder_id:
-            emit('error', {'message': 'Folder ID required'})
-            return
-            
-        # Don't allow deleting the default folder
-        if folder_id in [f"{user}_default"]:
-            emit('error', {'message': 'Cannot delete the default folder'})
-            return
-            
-        data = load_data()
-        
-        # Find the folder index
-        folder_index = None
-        for i, folder in enumerate(data["users"][user]["folders"]):
-            if folder["id"] == folder_id:
-                folder_index = i
-                break
-        
-        if folder_index is None:
-            emit('error', {'message': 'Folder not found'})
-            return
-        
-        # Get the chickens from this folder before removing it
-        chickens_to_move = data["users"][user]["folders"][folder_index]["chickens"]
-        
-        # Find the default folder
-        default_folder = None
-        for folder in data["users"][user]["folders"]:
-            if folder["id"] == f"{user}_default":
-                default_folder = folder
-                break
-        
-        if default_folder is None:
-            # Create a default folder if it doesn't exist
-            default_folder = {
-                "id": f"{user}_default",
-                "name": "Default",
-                "emoji": "📁",
-                "parent_id": None,
-                "chickens": []
-            }
-            data["users"][user]["folders"].append(default_folder)
-        
-        # Move chickens to default folder
-        default_folder["chickens"].extend(chickens_to_move)
-        
-        # Update any subfolders to point to parent's parent
-        parent_id = data["users"][user]["folders"][folder_index]["parent_id"]
-        for subfolder in data["users"][user]["folders"]:
-            if subfolder["parent_id"] == folder_id:
-                subfolder["parent_id"] = parent_id
-        
-        # Remove the folder
-        data["users"][user]["folders"].pop(folder_index)
-        save_data(data)
-        
-        # Send updated folders to clients
-        socketio.emit('folders_updated', {"user": user, "folders": data["users"][user]["folders"]})
-        
-    except Exception as e:
-        logger.error("Error deleting folder: %s", str(e))
-        emit('error', {'message': f'Error deleting folder: {str(e)}'})
-
-@socketio.on('move_chicken')
-def handle_move_chicken(json_data):
-    logger.info("move_chicken request: %s", json_data)
-    try:
-        user = json_data.get('user')
-        chicken_id = json_data.get('chicken_id')
-        target_folder_id = json_data.get('target_folder_id')
-        source_folder_id = json_data.get('source_folder_id')
-        
-        if not user or user not in USERS:
-            emit('error', {'message': 'Invalid user'})
-            return
-            
-        if not chicken_id:
-            emit('error', {'message': 'Chicken ID required'})
-            return
-            
-        if not target_folder_id:
-            emit('error', {'message': 'Target folder ID required'})
-            return
-            
-        data = load_data()
-        
-        # Find the source folder
-        source_folder = None
-        if source_folder_id:
-            for folder in data["users"][user]["folders"]:
-                if folder["id"] == source_folder_id:
-                    source_folder = folder
-                    break
-        else:
-            # If no source folder specified, search all folders
-            for folder in data["users"][user]["folders"]:
-                for chicken in folder["chickens"]:
-                    if chicken["id"] == chicken_id:
-                        source_folder = folder
-                        break
-                if source_folder:
-                    break
-        
-        if not source_folder:
-            emit('error', {'message': 'Source folder not found or chicken not found'})
-            return
-            
-        # Find the target folder
-        target_folder = None
-        for folder in data["users"][user]["folders"]:
-            if folder["id"] == target_folder_id:
-                target_folder = folder
-                break
-                
-        if not target_folder:
-            emit('error', {'message': 'Target folder not found'})
-            return
-            
-        # Find and remove the chicken from source folder
-        chicken = None
-        for i, chk in enumerate(source_folder["chickens"]):
-            if chk["id"] == chicken_id:
-                chicken = source_folder["chickens"].pop(i)
-                break
-                
-        if not chicken:
-            emit('error', {'message': 'Chicken not found in source folder'})
-            return
-            
-        # Add chicken to target folder
-        target_folder["chickens"].append(chicken)
-        save_data(data)
-        
-        # Send updated folders to clients
-        socketio.emit('folders_updated', {"user": user, "folders": data["users"][user]["folders"]})
-        
-    except Exception as e:
-        logger.error("Error moving chicken: %s", str(e))
-        emit('error', {'message': f'Error moving chicken: {str(e)}'})
-
 if __name__ == '__main__':
+    # Create data directory if it doesn't exist
+    os.makedirs('data', exist_ok=True)
+    
+    # Get port from environment variable (for Render.com) or use default
     port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, 
-                host='0.0.0.0', 
-                port=port,
-                debug=False,
-                use_reloader=False) 
+    
+    # In development, run with socketio.run
+    # In production (Render), gunicorn will handle this
+    if os.environ.get('RENDER', False):
+        # Let gunicorn handle the app
+        pass
+    else:
+        # Development mode
+        socketio.run(app, host='0.0.0.0', port=port) 
