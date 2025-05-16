@@ -23,13 +23,12 @@ if os.path.exists('render.env') and not os.environ.get('RENDER'):
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
 
-# Socket.IO configuration with auto-detection of async mode
+# Socket.IO configuration with async_mode explicitly set to threading for Windows
 # Keep ping interval short to prevent disconnections
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    # Let Socket.IO detect the best async mode automatically
-    # Windows will use threading, Render will use eventlet
+    async_mode='threading',  # Explicitly set for Windows compatibility
     logger=True,
     engineio_logger=True,
     ping_timeout=180,  # Increase timeout to prevent disconnects
@@ -42,6 +41,7 @@ USERS = ['luu', '4keni']
 
 # Chicken types configuration
 CHICKEN_TYPES = {
+    0: {"label": "Test Chicken (5 sec)", "intensity": "quick test", "time": 0.08, "points": 0},  # 5 seconds for testing
     1: {"label": "Light Chicken", "intensity": "casual", "time": 15, "points": 1},
     2: {"label": "Medium Chicken", "intensity": "normal", "time": 30, "points": 2},
     3: {"label": "Heavy Chicken", "intensity": "deep focus", "time": 45, "points": 3}
@@ -222,7 +222,7 @@ def handle_connect():
         days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
         data["days_remaining"] = max(0, days_remaining)
         
-        # Send the data to the connecting client only
+        # Send data to this client only (no broadcast parameter)
         emit('full_update', data)
     except Exception as e:
         logger.error("Error in connect handler: %s", str(e))
