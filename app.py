@@ -23,29 +23,15 @@ if os.path.exists('render.env') and not os.environ.get('RENDER'):
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chicfocus_secret_key')
 
-# Configure SocketIO with different modes for development vs production
-if os.environ.get('RENDER', False):
-    # Production mode (on Render.com) - use eventlet
-    socketio = SocketIO(
-        app,
-        cors_allowed_origins="*",
-        async_mode='eventlet',
-        logger=True,
-        engineio_logger=True,
-        ping_timeout=60,
-        ping_interval=25
-    )
-else:
-    # Development mode (Windows) - use threading
-    socketio = SocketIO(
-        app,
-        cors_allowed_origins="*",
-        async_mode='threading',
-        logger=True,
-        engineio_logger=True,
-        ping_timeout=60,
-        ping_interval=25
-    )
+# Single SocketIO configuration that works in both environments
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25
+)
 
 # Data storage
 DATA_FILE = 'data/chickens.json'
@@ -220,7 +206,7 @@ def handle_connect():
         days_remaining = 7 - (datetime.datetime.now() - cycle_start).days
         data["days_remaining"] = max(0, days_remaining)
         
-        # Send the data directly without using broadcast
+        # Send the data to the connecting client only
         emit('full_update', data)
     except Exception as e:
         logger.error("Error in connect handler: %s", str(e))
