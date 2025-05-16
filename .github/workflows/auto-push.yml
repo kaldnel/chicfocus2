@@ -1,0 +1,35 @@
+name: Auto Commit and Push
+
+on:
+  push:
+    branches: [ master ]
+  # Run this workflow manually from the Actions tab
+  workflow_dispatch:
+  # Run this every hour (you can adjust this)
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  auto-commit-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Check for changes
+      id: git-check
+      run: |
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'actions@github.com'
+        if [[ -n $(git status -s) ]]; then
+          echo "changes=true" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Commit and push if changes exist
+      if: steps.git-check.outputs.changes == 'true'
+      run: |
+        git add .
+        git commit -m "Auto-commit: Update files"
+        git push 

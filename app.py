@@ -29,18 +29,18 @@ if os.environ.get('RENDER', False):
     socketio = SocketIO(
         app,
         cors_allowed_origins="*",
-        async_mode=None,  # Let it auto-detect
+        async_mode='eventlet',
         logger=True,
         engineio_logger=True,
         ping_timeout=60,
         ping_interval=25
     )
 else:
-    # Development mode - use threading
+    # Development mode (Windows) - use threading
     socketio = SocketIO(
         app,
         cors_allowed_origins="*",
-        async_mode=None,  # Let it auto-detect
+        async_mode='threading',
         logger=True,
         engineio_logger=True,
         ping_timeout=60,
