@@ -2,13 +2,65 @@
   "users": {
     "luu": {
       "points": 0,
-      "sessions": []
+      "sessions": [],
+      "stats": {
+        "streak": 0,
+        "momentum_multiplier": 1.0,
+        "mystery_egg_used_date": null,
+        "mystery_egg_effect": null,
+        "lifetime_tier3_count": 0,
+        "longest_streak": 0,
+        "weekly_tier3_count": 0,
+        "weekly_chickens": 0,
+        "unlocked_skins": [
+          "default"
+        ],
+        "current_skin": "default",
+        "unlocked_themes": [
+          "default"
+        ],
+        "current_theme": "default",
+        "achievements": []
+      }
     },
     "4keni": {
       "points": 0,
-      "sessions": []
+      "sessions": [],
+      "stats": {
+        "streak": 0,
+        "momentum_multiplier": 1.0,
+        "mystery_egg_used_date": null,
+        "mystery_egg_effect": null,
+        "lifetime_tier3_count": 0,
+        "longest_streak": 0,
+        "weekly_tier3_count": 0,
+        "weekly_chickens": 0,
+        "unlocked_skins": [
+          "default"
+        ],
+        "current_skin": "default",
+        "unlocked_themes": [
+          "default"
+        ],
+        "current_theme": "default",
+        "achievements": []
+      }
     }
   },
   "cycle_start": "2025-05-14T15:39:31.857362",
-  "winner": "Tie"
+  "winner": "Tie",
+  "weekly_chaos_chicken": {
+    "offered": true,
+    "offered_to": "4keni",
+    "offered_date": "2025-05-17T13:58:09.950002",
+    "completed": false,
+    "completion_date": null,
+    "completed_by": null,
+    "challenge_type": "tier_challenge",
+    "challenge_params": {
+      "required_tier": 3,
+      "points": 20
+    },
+    "description": "Complete a Tier 3 focus session"
+  }
 }

@@ -39,6 +39,7 @@
                         <h1 class="user-title">chicfocus</h1>
                         <div class="user-controls">
                             <div class="current-user" id="luu-user-indicator">luu</div>
+                            <div class="user-cash" id="luu-cash">$0</div>
                             <button id="luu-logout-btn" onclick="logout()" class="logout-btn">Logout</button>
                         </div>
                     </header>
@@ -46,20 +47,29 @@
                     <div class="user-content">
                         <!-- Task Input Section -->
                         <div class="task-section card">
-                            <h3>Start New Chicken</h3>
+                            <h3>Start New Focus Session</h3>
                             <input type="text" id="luu-task-name" class="task-input" placeholder="Enter task name...">
                             
-                            <div class="tier-selection">
-                                <h4>Choose Chicken Tier:</h4>
-                                {% for tier, info in chicken_types.items() %}
-                                <label class="tier-option">
-                                    <input type="radio" name="luu-tier" value="{{ tier }}" {% if tier == 1 %}checked{% endif %}>
-                                    Tier {{ tier }} ({{ info.time }}min - {{ info.points }}pts)
-                                </label>
-                                {% endfor %}
+                            <div class="tier-selection" id="animal-selector-luu">
+                                <h4>Choose Animal to Raise:</h4>
+                                <div class="animal-cards" id="animal-cards-luu"></div>
+                                <input type="hidden" name="luu-tier" id="luu-animal-tier" value="1">
                             </div>
                             
-                            <button id="luu-start-btn" onclick="startChicken('luu')" class="start-btn">Start Chicken</button>
+                            <button id="luu-start-btn" onclick="startChicken('luu')" class="start-btn">Start Session</button>
+                        </div>
+
+                        <!-- Chaos Chicken Challenge Section -->
+                        <div id="luu-chaos-chicken" class="chaos-chicken-section card hidden">
+                            <h3>Weekly Challenge</h3>
+                            <div class="chaos-challenge-content">
+                                <p class="challenge-description"></p>
+                                <div class="challenge-rewards">
+                                    <span class="points-reward">+5 points</span>
+                                    <span class="achievement-reward">Special Achievement</span>
+                                </div>
+                                <button class="start-challenge-btn" onclick="startChaosChicken('luu')">Accept Challenge</button>
+                            </div>
                         </div>
 
                         <!-- Timer -->
@@ -82,18 +92,25 @@
                                 </div>
                                 <div class="stat-item">
                                     <span id="luu-sessions" class="stat-value">0</span>
-                                    <span class="stat-label">Today's Chickens</span>
+                                    <span class="stat-label">Today's Sessions</span>
                                 </div>
                             </div>
                         </div>
                         
                         <!-- Partner View -->
                         <div class="partner-section card">
-                            <h3>4keni's Status</h3>
+                            <h3 id="luu-partner-title">4keni's Status</h3>
                             <div class="partner-timer">
                                 <div id="keni-timer" class="partner-timer-display">00:00</div>
                                 <div id="keni-status" class="partner-status">Idle</div>
                             </div>
+                            <div class="partner-animal" id="luu-partner-animal"></div>
+                        </div>
+
+                        <!-- Barn View -->
+                        <div class="barn-section card">
+                            <h3>Your Barn</h3>
+                            <div class="barn-grid" id="luu-barn"></div>
                         </div>
                     </div>
                 </div>
@@ -104,6 +121,7 @@
                         <h1 class="user-title">chicfocus</h1>
                         <div class="user-controls">
                             <div class="current-user" id="keni-user-indicator">4keni</div>
+                            <div class="user-cash" id="keni-cash">$0</div>
                             <button id="keni-logout-btn" onclick="logout()" class="logout-btn">Logout</button>
                         </div>
                     </header>
@@ -111,20 +129,29 @@
                     <div class="user-content">
                         <!-- Task Input Section -->
                         <div class="task-section card">
-                            <h3>Start New Chicken</h3>
+                            <h3>Start New Focus Session</h3>
                             <input type="text" id="keni-task-name" class="task-input" placeholder="Enter task name...">
                             
-                            <div class="tier-selection">
-                                <h4>Choose Chicken Tier:</h4>
-                                {% for tier, info in chicken_types.items() %}
-                                <label class="tier-option">
-                                    <input type="radio" name="keni-tier" value="{{ tier }}" {% if tier == 1 %}checked{% endif %}>
-                                    Tier {{ tier }} ({{ info.time }}min - {{ info.points }}pts)
-                                </label>
-                                {% endfor %}
+                            <div class="tier-selection" id="animal-selector-keni">
+                                <h4>Choose Animal to Raise:</h4>
+                                <div class="animal-cards" id="animal-cards-keni"></div>
+                                <input type="hidden" name="keni-tier" id="keni-animal-tier" value="1">
                             </div>
                             
-                            <button id="keni-start-btn" onclick="startChicken('4keni')" class="start-btn">Start Chicken</button>
+                            <button id="keni-start-btn" onclick="startChicken('4keni')" class="start-btn">Start Session</button>
+                        </div>
+
+                        <!-- Chaos Chicken Challenge Section -->
+                        <div id="keni-chaos-chicken" class="chaos-chicken-section card hidden">
+                            <h3>Weekly Challenge</h3>
+                            <div class="chaos-challenge-content">
+                                <p class="challenge-description"></p>
+                                <div class="challenge-rewards">
+                                    <span class="points-reward">+5 points</span>
+                                    <span class="achievement-reward">Special Achievement</span>
+                                </div>
+                                <button class="start-challenge-btn" onclick="startChaosChicken('4keni')">Accept Challenge</button>
+                            </div>
                         </div>
 
                         <!-- Timer -->
@@ -147,18 +174,25 @@
                                 </div>
                                 <div class="stat-item">
                                     <span id="keni-sessions" class="stat-value">0</span>
-                                    <span class="stat-label">Today's Chickens</span>
+                                    <span class="stat-label">Today's Sessions</span>
                                 </div>
                             </div>
                         </div>
                         
                         <!-- Partner View -->
                         <div class="partner-section card">
-                            <h3>luu's Status</h3>
+                            <h3 id="keni-partner-title">luu's Status</h3>
                             <div class="partner-timer">
                                 <div id="luu-timer" class="partner-timer-display">00:00</div>
                                 <div id="luu-status" class="partner-status">Idle</div>
                             </div>
+                            <div class="partner-animal" id="keni-partner-animal"></div>
+                        </div>
+
+                        <!-- Barn View -->
+                        <div class="barn-section card">
+                            <h3>Your Barn</h3>
+                            <div class="barn-grid" id="keni-barn"></div>
                         </div>
                     </div>
                 </div>
@@ -179,6 +213,232 @@
         </div>
     </div>
 
+    <!-- Market Tab -->
+    <div id="market-tab" class="card" style="margin:2rem auto;max-width:800px;display:none;">
+        <div class="market-header">
+            <h3>Animal Market</h3>
+            <button onclick="hideMarketTab()" id="close-market-btn" class="market-back-btn">
+                <span class="back-icon">←</span> Back
+            </button>
+        </div>
+        <div class="market-content">
+            <div class="market-graph-container">
+                <img id="market-graph-img" src="/static/market_graph.png?v=" alt="Market Graph">
+                <div class="market-graph-overlay">
+                    <div class="market-graph-legend"></div>
+                </div>
+            </div>
+            <!-- Market Feed -->
+            <div id="market-feed" class="market-feed"></div>
+            <div class="market-prices-container">
+                <h4>Current Prices</h4>
+                <div id="market-prices" class="market-prices-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <button onclick="showMarketTab()" id="open-market-btn" class="market-btn">Market</button>
+
     <script src="/static/app.js?v=1.1"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/api/available_animals')
+            .then(res => res.json())
+            .then(animals => {
+                function renderAnimalCards(containerId, inputId) {
+                    const container = document.getElementById(containerId);
+                    container.innerHTML = '';
+                    animals.forEach((animal, idx) => {
+                        const card = document.createElement('div');
+                        card.className = 'animal-card';
+                        card.innerHTML = `<strong>${animal.name}</strong><br>${animal.duration} min`;
+                        card.onclick = () => {
+                            document.getElementById(inputId).value = idx + 1;
+                            Array.from(container.children).forEach(c => c.classList.remove('selected'));
+                            card.classList.add('selected');
+                        };
+                        if (idx === 0) card.classList.add('selected');
+                        container.appendChild(card);
+                    });
+                }
+                renderAnimalCards('animal-cards-luu', 'luu-animal-tier');
+                renderAnimalCards('animal-cards-keni', 'keni-animal-tier');
+            });
+    });
+
+    function timeAgo(ts) {
+        if (!ts) return '';
+        const now = new Date();
+        const then = new Date(ts);
+        const diff = Math.floor((now - then) / 1000);
+        if (diff < 60) return `${diff}s ago`;
+        if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+        return `${Math.floor(diff/86400)}d ago`;
+    }
+    function getAnimalImg(name) {
+        const map = {
+            'Chicken': 'chicken_tier1.svg',
+            'Goat': 'chicken_tier2.svg',
+            'Sheep': 'chicken_tier3.svg',
+            'Pig': 'pig.svg',
+            'Cow': 'cow.svg',
+            'Horse': 'horse.svg'
+        };
+        return `/static/images/${map[name]||'chicken_tier1.svg'}`;
+    }
+    function renderBarn(user) {
+        fetch(`/api/user_animals/${user}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById(user+'-cash').textContent = `$${data.cash}`;
+                const barn = document.getElementById(user+'-barn');
+                barn.innerHTML = '';
+                if (!data.inventory || !data.inventory.length) {
+                    barn.innerHTML = '<div class="empty-barn">No animals yet!</div>';
+                    return;
+                }
+                data.inventory.slice().reverse().forEach(animal => {
+                    const card = document.createElement('div');
+                    card.className = 'barn-animal-card';
+                    card.innerHTML = `
+                        <img src="${getAnimalImg(animal.name)}" alt="${animal.name}" class="barn-animal-img">
+                        <div class="barn-animal-name">${animal.name}</div>
+                        <div class="barn-animal-time">${timeAgo(animal.timestamp)}</div>
+                    `;
+                    barn.appendChild(card);
+                });
+            });
+    }
+    function getAnimalEmoji(name) {
+        return {
+            'Chicken': '🐔',
+            'Goat': '🐐',
+            'Sheep': '🐑',
+            'Pig': '🐖',
+            'Cow': '🐄',
+            'Horse': '🐎'
+        }[name] || '🐔';
+    }
+    function updatePartnerAnimal(user, partner) {
+        fetch(`/api/user_animals/${partner}`)
+            .then(res => res.json())
+            .then(data => {
+                const el = document.getElementById(user+'-partner-animal');
+                if (data.current_animal) {
+                    el.innerHTML = `<span class="partner-animal-label">${partner} is raising: <span class="partner-animal-emoji">${getAnimalEmoji(data.current_animal.name)}</span> <span class="partner-animal-name">${data.current_animal.name}</span></span>`;
+                } else {
+                    el.innerHTML = `<span class="partner-animal-label">${partner} is not raising an animal.</span>`;
+                }
+            });
+    }
+    function checkDailyCap(user) {
+        fetch(`/api/user_animals/${user}`)
+            .then(res => res.json())
+            .then(data => {
+                const cap = 5;
+                const picker = document.getElementById(user === 'luu' ? 'animal-selector-luu' : 'animal-selector-keni');
+                const startBtn = document.getElementById(user === 'luu' ? 'luu-start-btn' : 'keni-start-btn');
+                let warning = document.getElementById(user+'-cap-warning');
+                if (!warning) {
+                    warning = document.createElement('div');
+                    warning.id = user+'-cap-warning';
+                    warning.className = 'cap-warning';
+                    picker.parentNode.insertBefore(warning, picker.nextSibling);
+                }
+                if (data.today_count >= cap) {
+                    picker.classList.add('disabled');
+                    startBtn.disabled = true;
+                    warning.innerHTML = `Daily limit reached (${cap} animals). Come back tomorrow!`;
+                    warning.style.display = 'block';
+                } else {
+                    picker.classList.remove('disabled');
+                    startBtn.disabled = false;
+                    warning.style.display = 'none';
+                }
+            });
+    }
+    function refreshBarnsAndPartners() {
+        renderBarn('luu');
+        renderBarn('4keni');
+        updatePartnerAnimal('luu', '4keni');
+        updatePartnerAnimal('keni', 'luu');
+        checkDailyCap('luu');
+        checkDailyCap('4keni');
+    }
+    setInterval(refreshBarnsAndPartners, 10000);
+    document.addEventListener('DOMContentLoaded', refreshBarnsAndPartners);
+    </script>
+    <script>
+    function showMarketTab() {
+        document.getElementById('main-app').classList.add('hidden');
+        document.getElementById('market-tab').style.display = 'block';
+        fetch('/api/available_animals')
+            .then(res => res.json())
+            .then(animals => {
+                const prices = animals.map(a => `<div style='padding:0.5rem 0;border-bottom:1px solid #333;'><b>${a.name}</b>: $${a.base_price[0]} - $${a.base_price[1]} ${getAnimalEmoji(a.name)}</div>`).join('');
+                document.getElementById('market-prices').innerHTML = prices;
+                // Add cache buster to force reload of graph image
+                document.getElementById('market-graph-img').src = '/static/market_graph.png?v=' + Date.now();
+            });
+    }
+    function hideMarketTab() {
+        document.getElementById('main-app').classList.remove('hidden');
+        document.getElementById('market-tab').style.display = 'none';
+    }
+    </script>
+    <style>
+    .animal-cards { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .animal-card { border: 2px solid #ccc; border-radius: 8px; padding: 1rem; cursor: pointer; background: #fff; min-width: 100px; text-align: center; transition: border 0.2s, box-shadow 0.2s; }
+    .animal-card.selected { border: 2px solid #00ff41; box-shadow: 0 0 8px #00ff41; }
+    .luu-side .animal-card { background: #111; color: #fff; border: 2px solid #333; }
+    .luu-side .animal-card.selected { border: 2px solid #fff; box-shadow: 0 0 8px #fff; color: #fff; }
+    .user-cash { font-weight: bold; margin-left: 1rem; color: #00ff41; font-size: 1.1rem; }
+    .barn-section { margin-top: 1.5rem; }
+    .barn-grid { display: flex; flex-wrap: wrap; gap: 1rem; max-height: 180px; overflow-y: auto; }
+    .barn-animal-card { background: #222; border-radius: 8px; padding: 0.5rem; width: 90px; text-align: center; box-shadow: 0 2px 8px #0002; }
+    .barn-animal-img { width: 48px; height: 48px; object-fit: contain; margin-bottom: 0.25rem; }
+    .barn-animal-name { font-size: 0.95rem; font-weight: 500; color: #fff; }
+    .barn-animal-time { font-size: 0.8rem; color: #aaa; }
+    .empty-barn { color: #888; font-style: italic; padding: 1rem; }
+    .luu-side .barn-section, .luu-side .barn-grid, .luu-side .barn-animal-card { background: var(--luu-bg-card); color: var(--luu-text); }
+    .keni-side .barn-section, .keni-side .barn-grid, .keni-side .barn-animal-card { background: var(--keni-bg-card); color: var(--keni-text); }
+    .luu-side .user-cash { color: var(--luu-accent); }
+    .keni-side .user-cash { color: var(--keni-accent); }
+    .luu-side .cap-warning { color: #ff5252; background: #1a1a1a; border-radius: 6px; margin: 0.5rem 0; padding: 0.5rem; text-align: center; }
+    .keni-side .cap-warning { color: #d63384; background: #fff0f4; border-radius: 6px; margin: 0.5rem 0; padding: 0.5rem; text-align: center; }
+    .tier-selection.disabled, .tier-selection.disabled * { pointer-events: none; opacity: 0.5; }
+    .partner-animal { margin-top: 0.5rem; font-size: 1.05rem; }
+    .partner-animal-emoji { font-size: 1.3em; margin-right: 0.2em; }
+    .partner-animal-label { font-weight: 500; }
+    .market-btn {
+        position:fixed;top:10px;right:10px;z-index:1000;
+        background:var(--luu-accent);
+        color:#000;
+        border:none;
+        border-radius:8px;
+        padding:0.6rem 1.2rem;
+        font-weight:600;
+        font-size:1.1rem;
+        box-shadow:0 2px 8px #0002;
+        transition:background 0.2s;
+    }
+    .luu-side .market-btn { background:var(--luu-accent); color:#000; }
+    .keni-side .market-btn { background:var(--keni-accent); color:#fff; }
+    .market-btn:hover { background:#00cc33; color:#fff; }
+    .market-back-btn {
+        margin-top:1.5rem;
+        background:var(--luu-bg-card);
+        color:var(--luu-accent);
+        border:1px solid var(--luu-accent);
+        border-radius:8px;
+        padding:0.5rem 1.2rem;
+        font-weight:500;
+        font-size:1rem;
+        box-shadow:0 2px 8px #0002;
+        transition:background 0.2s;
+    }
+    .market-back-btn:hover { background:var(--luu-accent); color:#000; }
+    </style>
 </body>
 </html> 
